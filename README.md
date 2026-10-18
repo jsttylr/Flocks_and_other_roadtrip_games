@@ -1,3 +1,5 @@
+<img src="unraid/icon.png" width="96" align="right" alt="">
+
 # Roadtrip Games 🚙
 
 **The car games your family already plays, scored on an iPad and remembered forever.**
@@ -83,7 +85,7 @@ The program needs to run on something that stays on at home. It uses two ports: 
 
 ### Windows
 
-1. Download `roadtrip-games-windows.zip` from the latest build. On the repository's **Actions** tab, open the newest **build** run and download it under **Artifacts**. Once there are releases, it's also on the [Releases page](https://github.com/jsttylr/Flocks_and_other_roadtrip_games/releases).
+1. Download `roadtrip-games-windows.zip` from the [latest release](https://github.com/jsttylr/Flocks_and_other_roadtrip_games/releases/latest). (Every change also builds one under the **Actions** tab, in the newest **build** run's **Artifacts**, but GitHub only lets you download those while signed in.)
 2. Right-click the zip, choose **Extract All**, and put the folder somewhere permanent, for example `C:\RoadtripGames\`.
 3. Double-click `roadtrip-games.exe`. If Windows says "Windows protected your PC", click **More info**, then **Run anyway**.
 4. When Windows Firewall asks, tick **Private networks** and click **Allow**.
@@ -95,9 +97,7 @@ Mac and Linux builds (including a Raspberry Pi one) are in the same download.
 
 GitHub builds the Docker image on every change and stores it at `ghcr.io/jsttylr/flocks_and_other_roadtrip_games`. The tag `main` is always the newest build.
 
-This repository is private, so the image starts out private too, and Docker would need your GitHub login to download it. The easiest fix is to make just the image public. It contains only the finished program, not this code. On GitHub, go to your profile, **Packages**, **flocks_and_other_roadtrip_games**, **Package settings**, then under **Danger Zone** choose **Change visibility** and pick **Public**.
-
-If you'd rather keep it private, log in once on the Docker machine with `docker login ghcr.io`, using your GitHub username and a [personal access token](https://github.com/settings/tokens) with the `read:packages` permission as the password.
+It's free to download and needs no GitHub account or `docker login`.
 
 ### Docker Compose
 
@@ -133,15 +133,22 @@ docker run -d --name roadtrip-games --restart unless-stopped \
 
 Unraid can install it from a template, so you don't have to type the settings yourself.
 
-1. Make the image public first (see [Getting the Docker image](#getting-the-docker-image)). Unraid forgets a `docker login` every time it reboots, so a private image would stop updating.
-2. Download [`unraid/roadtrip-games.xml`](unraid/roadtrip-games.xml) from this repository.
-3. From another computer, open the Unraid flash share (`\\tower\flash` on Windows, `smb://tower/flash` on a Mac), and copy the file into `config/plugins/dockerMan/templates-user/`, renamed `my-roadtrip-games.xml`. (If the flash share isn't shared, turn it on under **Main**, **Flash**, **SMB Security Settings**, or copy the file there with the Unraid terminal.)
-4. In the Unraid web page, open the **Docker** tab, click **Add Container**, and pick **roadtrip-games** from the **Template** list under *User templates*.
-5. Check the settings:
+1. Download [`unraid/roadtrip-games.xml`](unraid/roadtrip-games.xml) from this repository (the **Download raw file** button), or straight onto the server from the Unraid terminal:
+
+   ```sh
+   mkdir -p /boot/config/plugins/dockerMan/templates-user
+   wget -O /boot/config/plugins/dockerMan/templates-user/my-roadtrip-games.xml \
+     https://raw.githubusercontent.com/jsttylr/Flocks_and_other_roadtrip_games/main/unraid/roadtrip-games.xml
+   ```
+
+   and skip to step 3.
+2. From another computer, open the Unraid flash share (`\\tower\flash` on Windows, `smb://tower/flash` on a Mac), and copy the file into `config/plugins/dockerMan/templates-user/`, renamed `my-roadtrip-games.xml`. (If the flash drive isn't shared, turn it on under **Main**, **Flash**, **SMB Security Settings**, or use the terminal command above.)
+3. In the Unraid web page, open the **Docker** tab, click **Add Container**, and pick **roadtrip-games** from the **Template** list under *User templates*.
+4. Check the settings:
    - **Web page** `8070` and **Secure web page (GPS)** `8443`. Change the left-hand numbers only if something else already uses them.
    - **Game history** `/mnt/user/appdata/roadtrip-games`, where every trip is kept.
    - **Server address for the iPad**: your Unraid server's IP address (shown at the top of the Unraid page), plus `tower.local` or your server's name. If you reach home with Unraid's built-in WireGuard and the iPad uses a different address over the tunnel, add that too, separated by a comma.
-6. Click **Apply**. When it's running, click the container's icon and choose **WebUI** to open it, then carry on with [Setting up the iPad](#setting-up-the-ipad).
+5. Click **Apply**. When it's running, click the container's icon and choose **WebUI** to open it, then carry on with [Setting up the iPad](#setting-up-the-ipad).
 
 To update, use **Check for Updates** on the Docker tab, then **Apply Update**. Include `/mnt/user/appdata/roadtrip-games` in your appdata backups.
 
@@ -186,3 +193,7 @@ Every tap is saved as a small "event": a cow counted, a cemetery called, a plate
 | `-no-browser` | | Don't open a browser on start |
 
 To check changes: `go test ./...` and `node --test 'tests/*.test.js'`.
+
+## Ideas and problems
+
+Found a bug, or does your family play a game this should keep score for? [Open an issue](https://github.com/jsttylr/Flocks_and_other_roadtrip_games/issues). Every family plays Flocks a little differently; the rules all live in [`web/games.js`](web/games.js) if you want to make your own version.

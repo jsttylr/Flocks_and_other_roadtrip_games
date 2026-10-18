@@ -12,6 +12,7 @@
   <Project>https://github.com/jsttylr/Flocks_and_other_roadtrip_games</Project>
   <Overview>Score Flocks, Zombie Flocks, Volvo trucks and the license plate game on an iPad in the car, with lifetime stats, awards and a map of every trip. The iPad saves everything itself and syncs to this server whenever it can reach home. Open the plain address once on the iPad and follow "Turn on locations for the map" under Trips and players to use the secure address.</Overview>
   <Category>Tools: Other:</Category>
+  <Icon>https://raw.githubusercontent.com/jsttylr/Flocks_and_other_roadtrip_games/main/unraid/icon.png</Icon>
   <WebUI>http://[IP]:[PORT:8070]/</WebUI>
   <ExtraParams/>
   <PostArgs/>
