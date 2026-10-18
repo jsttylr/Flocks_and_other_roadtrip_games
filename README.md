@@ -165,12 +165,18 @@ Do this once, at home on your Wi-Fi.
 
    - Tap **Download the home certificate**, then **Allow**.
    - Open **Settings**, tap **Profile Downloaded** near the top, then **Install**.
-   - Go to **Settings, General, About, Certificate Trust Settings** and switch on **Roadtrip Games at home**.
+   - Go to **Settings, General, About, Certificate Trust Settings** and switch on **Roadtrip Games at home**. **Don't skip this one.** Installing the profile alone isn't enough: until this switch is on, Safari still shows a certificate warning and won't open the secure address.
    - Open the secure address it lists, for example `https://192.168.1.50:8443`, and allow location when Safari asks.
    - Add it to the home screen (the Share button, then **Add to Home Screen**) and use that icon from now on.
 3. Add the players and start a trip.
 
 **Why the certificate?** Safari only gives a web page the iPad's GPS when the page is on a secure (https) address. The program makes its own certificate the first time it runs, just for your home server, and the iPad is told to trust it once. As a bonus, the secure address lets the iPad keep a copy of the page, so the app opens even with no signal.
+
+**Still getting a certificate warning?** Don't tap past it; Safari won't share GPS with a page it doesn't trust, and often won't load it at all. Check these instead:
+
+- The **Certificate Trust Settings** switch above is on.
+- The address you typed is listed in `ROADTRIP_HOSTS` (Docker and Unraid), letter for letter. After changing that setting, restart the container so it makes a new certificate. The iPad doesn't need to trust anything again.
+- The address starts with `https://` and uses the secure port (8443), not the plain one.
 
 **In the car:** keep the VPN on so the iPad can reach home over cell. The badge at the top says **Saved at home** when everything has been sent, or how many things are waiting. Anything waiting goes the next time the iPad reaches home.
 
