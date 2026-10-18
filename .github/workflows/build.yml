@@ -1,0 +1,45 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+      - name: Test the game rules
+        run: node --test 'tests/*.test.js'
+      - name: Build all platforms
+        run: |
+          mkdir -p dist
+          build() {
+            CGO_ENABLED=0 GOOS=$1 GOARCH=$2 go build -trimpath -ldflags="-s -w $4" -o "dist/$3" .
+          }
+          build windows amd64 roadtrip-games.exe "-H windowsgui"
+          (cd dist && zip -q -j roadtrip-games-windows.zip roadtrip-games.exe ../README.md ../LICENSE && rm roadtrip-games.exe)
+          build darwin arm64 roadtrip-games-mac-apple-silicon
+          build darwin amd64 roadtrip-games-mac-intel
+          build linux amd64 roadtrip-games-linux
+          build linux arm64 roadtrip-games-raspberry-pi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: roadtrip-games
+          path: dist/*
+      - name: Attach downloads to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber

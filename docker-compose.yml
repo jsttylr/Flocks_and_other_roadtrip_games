@@ -1,0 +1,16 @@
+# Roadtrip Games on a Docker host. Start it with: docker compose up -d
+services:
+  roadtrip-games:
+    # "latest" is the newest release; use "main" for the newest build before a release exists.
+    image: ghcr.io/jsttylr/flocks_and_other_roadtrip_games:latest
+    container_name: roadtrip-games
+    restart: unless-stopped
+    ports:
+      - "8070:8070"
+    volumes:
+      - roadtrip-data:/data   # the game history survives updates
+    environment:
+      - TZ=America/New_York
+
+volumes:
+  roadtrip-data:
