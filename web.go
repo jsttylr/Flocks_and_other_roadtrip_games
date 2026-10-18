@@ -14,8 +14,10 @@ import (
 var webFiles embed.FS
 
 type App struct {
-	store *Store
-	port  int
+	store     *Store
+	port      int
+	httpsPort int    // 0 when there's no secure address
+	certs     *Certs // nil when there's no secure address
 }
 
 func (a *App) handler() http.Handler {
@@ -30,7 +32,23 @@ func (a *App) handler() http.Handler {
 	}))
 
 	mux.HandleFunc("GET /api/status", func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(w, map[string]any{"version": appVersion, "events": a.store.Count(), "addresses": lanAddresses(a.port)})
+		st := map[string]any{"version": appVersion, "events": a.store.Count(), "addresses": lanAddresses(a.port)}
+		if a.certs != nil {
+			st["secure_addresses"] = describeHosts(a.certs.hosts, a.httpsPort)
+			st["fingerprint"] = a.certs.fingerprint()
+		}
+		writeJSON(w, st)
+	})
+
+	// The certificate authority the iPad is asked to trust, for the secure address.
+	mux.HandleFunc("GET /roadtrip-games.crt", func(w http.ResponseWriter, req *http.Request) {
+		if a.certs == nil {
+			http.NotFound(w, req)
+			return
+		}
+		w.Header().Set("Content-Type", "application/x-x509-ca-cert")
+		w.Header().Set("Content-Disposition", `attachment; filename="roadtrip-games.crt"`)
+		w.Write(a.certs.caPEM)
 	})
 
 	// The tablet asks for everything after the last event it has.

@@ -10,7 +10,9 @@ import (
 	"testing"
 )
 
-func ev(id, typ string) Event { return Event{ID: id, Type: typ, TS: 1, Data: json.RawMessage(`{"a":1}`)} }
+func ev(id, typ string) Event {
+	return Event{ID: id, Type: typ, TS: 1, Data: json.RawMessage(`{"a":1}`)}
+}
 
 func TestStoreKeepsEventsOnceAndInOrder(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "events.jsonl")

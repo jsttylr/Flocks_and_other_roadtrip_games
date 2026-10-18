@@ -1,16 +1,20 @@
 # Roadtrip Games on a Docker host. Start it with: docker compose up -d
 services:
   roadtrip-games:
-    # "latest" is the newest release; use "main" for the newest build before a release exists.
-    image: ghcr.io/jsttylr/flocks_and_other_roadtrip_games:latest
+    # "main" is the newest build; switch to "latest" once you publish releases.
+    image: ghcr.io/jsttylr/flocks_and_other_roadtrip_games:main
     container_name: roadtrip-games
     restart: unless-stopped
     ports:
-      - "8070:8070"
+      - "8070:8070"   # plain address
+      - "8443:8443"   # secure address (needed for GPS on the iPad)
     volumes:
       - roadtrip-data:/data   # the game history survives updates
     environment:
       - TZ=America/New_York
+      # The address the iPad uses to reach this machine (change to yours), so the
+      # secure address works. List several separated by commas.
+      - ROADTRIP_HOSTS=192.168.1.50
 
 volumes:
   roadtrip-data:

@@ -11,6 +11,8 @@ FROM scratch
 COPY --from=build /out/roadtrip-games /roadtrip-games
 # The game history lives in /data; keep it on a volume so it survives updates.
 ENV ROADTRIP_DATA=/data
+# Set ROADTRIP_HOSTS to the address the iPad uses to reach the Docker machine, so
+# the secure address's certificate covers it (the container can't see it itself).
 VOLUME /data
-EXPOSE 8070/tcp
+EXPOSE 8070/tcp 8443/tcp
 ENTRYPOINT ["/roadtrip-games", "-no-browser"]
