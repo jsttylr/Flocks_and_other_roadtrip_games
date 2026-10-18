@@ -1,16 +1,19 @@
 // The rules of the games, and how scores, stats and awards are worked out from
 // the list of events. Nothing in here touches the page, so it can be tested.
 
-// Flocks: live farm animals. A cemetery kills flocks; a church brings yours back.
+// Flocks: live animals. A cemetery kills flocks; a church brings yours back.
+// Deer count too, but they aren't farm animals, so Old MacDonald doesn't need them.
 const ANIMALS = [
-  { id: 'cow', name: 'Cows', icon: '🐄' },
-  { id: 'horse', name: 'Horses', icon: '🐎' },
-  { id: 'sheep', name: 'Sheep', icon: '🐑' },
-  { id: 'goat', name: 'Goats', icon: '🐐' },
-  { id: 'chicken', name: 'Chickens', icon: '🐔' },
-  { id: 'llama', name: 'Llamas & alpacas', icon: '🦙' },
-  { id: 'pig', name: 'Pigs', icon: '🐖' },
+  { id: 'cow', name: 'Cows', icon: '🐄', farm: true },
+  { id: 'horse', name: 'Horses', icon: '🐎', farm: true },
+  { id: 'sheep', name: 'Sheep', icon: '🐑', farm: true },
+  { id: 'goat', name: 'Goats', icon: '🐐', farm: true },
+  { id: 'chicken', name: 'Chickens', icon: '🐔', farm: true },
+  { id: 'llama', name: 'Llamas & alpacas', icon: '🦙', farm: true },
+  { id: 'pig', name: 'Pigs', icon: '🐖', farm: true },
+  { id: 'deer', name: 'Deer', icon: '🦌' },
 ];
+const FARM_ANIMALS = ANIMALS.filter(a => a.farm);
 
 // Zombie flocks: roadkill. Already dead, so cemeteries and churches leave them alone.
 const ZOMBIES = [
@@ -20,7 +23,25 @@ const ZOMBIES = [
   { id: 'fox', name: 'Foxes', icon: '🦊' },
   { id: 'raccoon', name: 'Raccoons', icon: '🦝' },
   { id: 'opossum', name: 'Opossums', icon: '🐀' },
+  { id: 'groundhog', name: 'Groundhogs', icon: '🦫' },
+  { id: 'iguana', name: 'Iguanas', icon: '🦎' },
 ];
+
+// Fields: crops spotted from the car, a game of their own. Each field also
+// puts one of the spotter's farmers on that tile of the Realm.
+const CROPS = [
+  { id: 'corn', name: 'Corn', icon: '🌽' },
+  { id: 'soy', name: 'Soybeans', icon: '🫘' },
+  { id: 'wheat', name: 'Wheat', icon: '🌾' },
+  { id: 'tobacco', name: 'Tobacco', icon: '🍂' },
+  { id: 'cotton', name: 'Cotton', icon: '☁️' },
+  { id: 'hay', name: 'Hay', icon: '🪹' },
+  { id: 'sunflower', name: 'Sunflowers', icon: '🌻' },
+  { id: 'pumpkin', name: 'Pumpkins', icon: '🎃' },
+  { id: 'orchard', name: 'Orchard', icon: '🍎', res: 'lumber' },
+  { id: 'vineyard', name: 'Vineyard', icon: '🍇', res: 'lumber' },
+];
+const cropRes = id => (CROPS.find(c => c.id === id) || {}).res || 'grain';
 
 // Volvo trucks, by cab colour, one point each. One with VOLVO on the cab
 // fairing is a "Volvo truck <colour> Volvo" and scores double.
@@ -36,6 +57,14 @@ const VOLVO_COLORS = [
   { id: 'brown', name: 'Brown', hex: '#6d4c41' },
   { id: 'purple', name: 'Purple', hex: '#6a1b9a' },
   { id: 'other', name: 'Other', hex: 'linear-gradient(135deg,#e53935,#fdd835,#43a047,#1e88e5)' },
+];
+// Other Volvos, scored on the same tab: classic cars, wagons and equipment.
+const VOLVO_OTHERS = [
+  { id: 'classic', short: 'Classic', name: 'Classic Volvo', note: '140, 240, 740 or 850', icon: '🚗', points: 2 },
+  { id: 'wagon', short: 'Wagon', name: 'Volvo wagon', note: 'any newer estate', icon: '🚙', points: 1 },
+  { id: 'excavator', short: 'Excavator', name: 'Volvo excavator', note: 'construction', icon: '🏗️', points: 2 },
+  { id: 'loader', short: 'Loader', name: 'Volvo wheel loader', note: 'construction', icon: '🚜', points: 2 },
+  { id: 'hauler', short: 'Hauler', name: 'Volvo dump truck', note: 'construction hauler', icon: '⛰️', points: 2 },
 ];
 function volvoName(color, branded) {
   const c = (VOLVO_COLORS.find(v => v.id === color) || { name: color }).name.toLowerCase();
@@ -104,15 +133,16 @@ const AWARDS = [
   { id: 'champion', repeat: true, game: 'flocks', icon: '🏆', name: 'Flock Champion', desc: 'Have the biggest flock at the end of a trip', check: c => c.won && c.won.includes('flocks') },
   { id: 'dynasty', game: 'flocks', icon: '🏰', name: 'Dynasty', desc: 'Win Flocks on 5 trips', check: c => c.life.wins.flocks >= 5 },
   { id: 'comeback', repeat: true, game: 'flocks', icon: '🔥', name: 'Comeback Kid', desc: 'Win Flocks on a trip where you lost your flock', check: c => c.won && c.won.includes('flocks') && c.tp.deaths > 0 },
-  { id: 'old_macdonald', repeat: true, game: 'flocks', icon: '🚜', name: 'Old MacDonald', desc: 'Count all seven kinds of animal on one trip', check: c => c.tp && ANIMALS.every(a => c.tp.byAnimal[a.id]) },
-  { id: 'triple_crown', repeat: true, game: 'flocks', icon: '🎖️', name: 'Triple Crown', desc: 'Win Flocks, Zombies and Volvos on the same trip', check: c => c.won && c.won.length === 3 },
+  { id: 'old_macdonald', repeat: true, game: 'flocks', icon: '🚜', name: 'Old MacDonald', desc: 'Count all seven kinds of farm animal on one trip', check: c => c.tp && FARM_ANIMALS.every(a => c.tp.byAnimal[a.id]) },
+  { id: 'bambi', repeat: true, game: 'flocks', icon: '🫎', name: 'Bambi Spotter', desc: 'Count 5 live deer on one trip', check: c => c.tp && (c.tp.byAnimal.deer || 0) >= 5 },
+  { id: 'triple_crown', repeat: true, game: 'flocks', icon: '🎖️', name: 'Triple Crown', desc: 'Win Flocks, Zombies and Volvos on the same trip', check: c => c.won && ['flocks', 'zombies', 'volvos'].every(g => c.won.includes(g)) },
   { id: 'ghost_story', hidden: true, repeat: true, game: 'flocks', icon: '👻', name: 'Ghost Story', desc: 'Call a cemetery on Halloween', check: c => c.e.type === 'flock.cemetery' && day(c.e.ts).m === 10 && day(c.e.ts).d === 31 },
   { id: 'easter', hidden: true, repeat: true, game: 'flocks', icon: '🥚', name: 'He Is Risen', desc: 'Bring your flock back with a church on Easter Sunday', check: c => { if (c.e.type !== 'flock.church') return false; const t = day(c.e.ts), x = easter(t.y); return t.m === x.m && t.d === x.d; } },
 
   { id: 'first_zombie', game: 'zombies', icon: '🧟', name: 'Zombie Spotter', desc: 'Spot your first zombie', check: c => c.life.zombies >= 1 },
   { id: 'zombie_hunter', game: 'zombies', icon: '🔦', name: 'Zombie Hunter', desc: 'Spot 25 zombies over all your trips', check: c => c.life.zombies >= 25 },
   { id: 'apocalypse', game: 'zombies', icon: '☣️', name: 'Zombie Apocalypse', desc: 'Spot 100 zombies over all your trips', check: c => c.life.zombies >= 100 },
-  { id: 'zombie_zoo', repeat: true, game: 'zombies', icon: '🐾', name: 'Zombie Zoo', desc: 'Spot all six kinds of zombie on one trip', check: c => c.tp && ZOMBIES.every(z => c.tp.zombieBy[z.id]) },
+  { id: 'zombie_zoo', repeat: true, game: 'zombies', icon: '🐾', name: 'Zombie Zoo', desc: 'Spot all eight kinds of zombie on one trip', check: c => c.tp && ZOMBIES.every(z => c.tp.zombieBy[z.id]) },
   { id: 'zombie_king', repeat: true, game: 'zombies', icon: '🦴', name: 'Zombie King', desc: 'Have the biggest zombie flock at the end of a trip', check: c => c.won && c.won.includes('zombies') },
   { id: 'oh_deer', repeat: true, game: 'zombies', icon: '🦌', name: 'Oh Deer', desc: 'Spot 10 zombie deer on one trip', check: c => c.tp && (c.tp.zombieBy.deer || 0) >= 10 },
   { id: 'halloween', hidden: true, repeat: true, game: 'zombies', icon: '🎃', name: 'Trick or Treat', desc: 'Spot a zombie on Halloween', check: c => zombieOn(c, t => t.m === 10 && t.d === 31) },
@@ -120,6 +150,8 @@ const AWARDS = [
   { id: 'friday13', hidden: true, repeat: true, game: 'zombies', icon: '🔪', name: 'Friday the 13th', desc: 'Spot a zombie on Friday the 13th', check: c => zombieOn(c, t => t.wd === 5 && t.d === 13) },
   { id: 'witching_hour', hidden: true, repeat: true, game: 'zombies', icon: '🕛', name: 'Witching Hour', desc: 'Spot a zombie between midnight and 3 in the morning', check: c => zombieOn(c, t => t.h < 3) },
   { id: 'full_moon', hidden: true, repeat: true, game: 'zombies', icon: '🌕', name: 'Bad Moon Rising', desc: 'Spot a zombie on the night of a full moon', check: c => zombieOn(c, () => fullMoon(c.e.ts)) },
+  { id: 'here_be_dragons', game: 'zombies', icon: '🦖', name: 'Here Be Dragons', desc: 'Spot a zombie iguana', check: c => (c.life.zombieBy.iguana || 0) >= 1 },
+  { id: 'shadow', hidden: true, repeat: true, game: 'zombies', icon: '🌤️', name: 'Six More Weeks', desc: 'Spot a zombie groundhog on Groundhog Day (February 2)', check: c => zombieOn(c, (t, e) => e.data.animal === 'groundhog' && t.m === 2 && t.d === 2) },
   { id: 'rudolph', hidden: true, repeat: true, game: 'zombies', icon: '🎄', name: 'Grandma Got Run Over', desc: 'Spot a zombie deer on Christmas Eve or Christmas Day', check: c => zombieOn(c, (t, e) => e.data.animal === 'deer' && t.m === 12 && (t.d === 24 || t.d === 25)) },
 
   { id: 'first_volvo', game: 'volvos', icon: '🚚', name: 'Truck Spotter', desc: 'Spot your first Volvo truck', check: c => c.life.volvos >= 1 },
@@ -127,7 +159,19 @@ const AWARDS = [
   { id: 'rainbow', repeat: true, game: 'volvos', icon: '🌈', name: 'Rainbow Fleet', desc: 'Spot Volvo trucks in 6 colours on one trip', check: c => c.tp && Object.keys(c.tp.volvoBy).length >= 6 },
   { id: 'convoy', game: 'volvos', icon: '🛻', name: 'Convoy', desc: 'Spot 100 Volvo trucks over all your trips', check: c => c.life.volvos >= 100 },
   { id: 'volvo_champ', repeat: true, game: 'volvos', icon: '🥇', name: 'Volvo Champion', desc: 'Score the most Volvo points on a trip', check: c => c.won && c.won.includes('volvos') },
+  { id: 'brick', game: 'volvos', icon: '🧱', name: 'The Brick', desc: 'Spot a classic Volvo (140, 240, 740 or 850)', check: c => (c.life.volvoKind.classic || 0) >= 1 },
+  { id: 'family_hauler', game: 'volvos', icon: '🎒', name: 'Family Hauler', desc: 'Spot 10 Volvo wagons over all your trips', check: c => (c.life.volvoKind.wagon || 0) >= 10 },
+  { id: 'heavy_metal', game: 'volvos', icon: '👷', name: 'Heavy Metal', desc: 'Spot a piece of Volvo construction equipment', check: c => ['excavator', 'loader', 'hauler'].some(k => c.life.volvoKind[k]) },
+  { id: 'smorgasbord', repeat: true, game: 'volvos', icon: '🇸🇪', name: 'Smörgåsbord', desc: 'Spot a Volvo truck and every other kind of Volvo on one trip', check: c => c.tp && c.tp.volvos > 0 && VOLVO_OTHERS.every(k => c.tp.volvoKind[k.id]) },
   { id: 'fleet', repeat: true, game: 'volvos', icon: '🚛', name: 'Fleet Manager', desc: 'Spot 25 Volvo trucks on one trip', check: c => c.tp && c.tp.volvos >= 25 },
+
+  { id: 'first_field', game: 'fields', icon: '🌱', name: 'Green Thumb', desc: 'Spot your first field', check: c => c.life.fields >= 1 },
+  { id: 'corn_maze', game: 'fields', icon: '🌽', name: 'Corn Maze', desc: 'Spot 25 corn fields over all your trips', check: c => (c.life.cropBy.corn || 0) >= 25 },
+  { id: 'orchard_keeper', game: 'fields', icon: '🍏', name: 'Orchard Keeper', desc: 'Spot 10 orchards over all your trips', check: c => (c.life.cropBy.orchard || 0) >= 10 },
+  { id: 'harvest_moon', repeat: true, game: 'fields', icon: '🎑', name: 'Harvest Moon', desc: 'Spot every kind of crop on one trip', check: c => c.tp && CROPS.every(x => c.tp.cropBy[x.id]) },
+  { id: 'field_champ', repeat: true, game: 'fields', icon: '🏵️', name: 'Field Marshal', desc: 'Spot the most fields on a trip', check: c => c.won && c.won.includes('fields') },
+  { id: 'great_plains', game: 'fields', icon: '🌄', name: 'Great Plains', desc: 'Spot 250 fields over all your trips', check: c => c.life.fields >= 250 },
+  { id: 'jack_o', hidden: true, repeat: true, game: 'fields', icon: '🕯️', name: 'Pumpkin King', desc: 'Spot a pumpkin patch in October', check: c => c.e.type === 'field.add' && c.e.data.crop === 'pumpkin' && day(c.e.ts).m === 10 },
 
   { id: 'first_plate', game: 'plates', icon: '🚗', name: 'Plate Spotters', desc: 'Your car finds its first plate', check: c => c.life.uniquePlates.size >= 1 },
   { id: 'aloha', game: 'plates', icon: '🌺', name: 'Aloha', desc: 'Your car finds a Hawaii plate', check: c => c.life.uniquePlates.has('HI') },
@@ -161,14 +205,26 @@ const AWARDS = [
   { id: 'knighted', game: 'realm', icon: '🛡️', name: 'Knighted', desc: 'Reach the rank of Knight (3 Realm points)', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 3 },
   { id: 'duke', game: 'realm', icon: '🎩', name: 'Your Grace', desc: 'Reach the rank of Duke (15 Realm points)', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 15 },
   { id: 'monarch', game: 'realm', icon: '🫅', name: 'Long Live the Monarch', desc: 'Reach 21 Realm points', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 21 },
+  { id: 'abbot', game: 'realm', icon: '🛐', name: 'Abbot', desc: 'Found a monastery with a church', check: c => c.life.realm.monasteries >= 1 },
+  { id: 'full_circle', game: 'realm', icon: '⭕', name: 'Full Circle', desc: 'Complete a monastery (visit all 6 tiles around it)', check: c => c.life.realm.completed >= 1 },
+  { id: 'gold_rush', game: 'realm', icon: '🪙', name: 'Gold Rush', desc: 'Hold 20 gold at once', check: c => c.realm && c.realm.purse[c.pid] && c.realm.purse[c.pid].gold >= 20 },
+  { id: 'breadbasket', game: 'realm', icon: '🥖', name: 'Breadbasket', desc: 'Hold a farm of 5 tiles or more', check: c => c.realm && c.realm.farms.some(f => f.owners.includes(c.pid) && f.hexes.length >= 5) },
   { id: 'first_steps', game: 'explore', icon: '👣', name: 'First Steps', desc: 'Explore your first new map tile', check: c => c.life.explore.tiles >= 1 },
   { id: 'pioneer', game: 'explore', icon: '🚩', name: 'Pioneer', desc: 'Be the first to spot something in a new tile', check: c => c.life.explore.pioneered >= 1 },
-  { id: 'frontier', game: 'explore', icon: '🏕️', name: 'Frontier Spirit', desc: 'Pioneer 25 tiles', check: c => c.life.explore.pioneered >= 25 },
-  { id: 'off_the_map', repeat: true, game: 'explore', icon: '🔭', name: 'Off the Map', desc: 'Explore 20 new tiles on one trip', check: c => c.tp && c.tp.explored >= 20 },
-  { id: 'cartographer', game: 'explore', icon: '📜', name: 'Cartographer', desc: 'Explore 100 tiles', check: c => c.life.explore.tiles >= 100 },
+  { id: 'frontier', game: 'explore', icon: '🏕️', name: 'Frontier Spirit', desc: 'Pioneer 50 tiles', check: c => c.life.explore.pioneered >= 50 },
+  { id: 'off_the_map', repeat: true, game: 'explore', icon: '🔭', name: 'Off the Map', desc: 'Explore 40 new tiles on one trip', check: c => c.tp && c.tp.explored >= 40 },
+  { id: 'cartographer', game: 'explore', icon: '📜', name: 'Cartographer', desc: 'Explore 200 tiles', check: c => c.life.explore.tiles >= 200 },
   { id: 'regular', game: 'explore', icon: '☕', name: 'Regulars', desc: 'Pass through the same tile on 10 trips', check: c => c.life.explore.mostVisits >= 10 },
   { id: 'far_from_home', game: 'explore', icon: '🛰️', name: 'Far From Home', desc: 'Reach a tile 500 km from where your map began', check: c => c.life.explore.farthest >= 500 },
   { id: 'thousand_miles', game: 'explore', icon: '🌎', name: 'A Thousand Miles', desc: 'Reach a tile 1,600 km from where your map began', check: c => c.life.explore.farthest >= 1600 },
+  { id: 'first_leg', game: 'drive', icon: '🔑', name: 'Behind the Wheel', desc: 'Drive part of a trip', check: c => c.life.drive.km > 0 },
+  { id: 'wheelman', repeat: true, game: 'drive', icon: '🏎️', name: 'Wheelman', desc: 'Drive 50 km on one trip', check: c => c.tp && c.tp.driven >= 50 },
+  { id: 'marathon', repeat: true, game: 'drive', icon: '⏱️', name: 'Marathon', desc: 'Drive 300 km without swapping drivers', check: c => c.tp && c.tp.bestStint >= 300 },
+  { id: 'relay', repeat: true, game: 'drive', icon: '🔄', name: 'Relay Team', desc: 'Swap drivers 3 times on one trip (everyone in the car gets it)', check: c => c.trip && c.trip.swaps >= 3 },
+  { id: 'night_shift', game: 'drive', icon: '🦉', name: 'Night Shift', desc: 'Drive after 9 at night', check: c => c.life.drive.night > 0 },
+  { id: 'chauffeur', game: 'drive', icon: '🧢', name: 'Chauffeur', desc: 'Drive on 10 trips', check: c => c.life.drive.trips >= 10 },
+  { id: 'iron_butt', game: 'drive', icon: '🛞', name: 'Iron Butt', desc: 'Drive 1,000 km over all your trips', check: c => c.life.drive.km >= 1000 },
+  { id: 'road_scholar', game: 'drive', icon: '📏', name: 'Road Scholar', desc: 'Drive 10,000 km over all your trips', check: c => c.life.drive.km >= 10000 },
   { id: 'buckle_up', game: 'trips', icon: '🚙', name: 'Buckle Up', desc: 'Play your first trip', check: c => c.life.trips >= 1 },
   { id: 'road_warrior', game: 'trips', icon: '🛣️', name: 'Road Warrior', desc: 'Play on 10 trips', check: c => c.life.trips >= 10 },
   { id: 'globetrotter', game: 'trips', icon: '🧳', name: 'Globetrotter', desc: 'Play on 25 trips', check: c => c.life.trips >= 25 },
@@ -189,22 +245,24 @@ const CONTESTS = [
   { id: 'flocks', name: 'Flocks', icon: '🐄', score: tp => tp.score },
   { id: 'zombies', name: 'Zombies', icon: '🧟', score: tp => tp.zombies },
   { id: 'volvos', name: 'Volvos', icon: '🚚', score: tp => tp.volvoPoints },
+  { id: 'fields', name: 'Fields', icon: '🌽', score: tp => tp.fields },
 ];
 
 function emptyLife() {
   return {
-    trips: 0, wins: { flocks: 0, zombies: 0, volvos: 0 },
+    trips: 0, wins: { flocks: 0, zombies: 0, volvos: 0, fields: 0 },
     animals: 0, byAnimal: {}, biggest: 0, bestFlock: 0,
     kills: 0, deaths: 0, lost: 0, biggestLoss: 0, churches: 0, raised: 0, biggestRaise: 0,
-    zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0,
+    zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0, volvoKind: {},
+    fields: 0, cropBy: {}, drive: { km: 0, trips: 0, night: 0, bestStint: 0 },
     uniquePlates: new Set(), awards: {}, badges: 0,
     explore: { tiles: 0, pioneered: 0, farthest: 0, mostVisits: 0 },
-    realm: { roads: 0, settlements: 0, cities: 0, trades: 0, bank: 0, stolen: 0, harvested: 0, turns: 0 },
+    realm: { roads: 0, settlements: 0, cities: 0, trades: 0, bank: 0, stolen: 0, harvested: 0, turns: 0, monasteries: 0, completed: 0, gold: 0, wage: 0 },
   };
 }
 
 function emptyTripPlayer() {
-  return { explored: 0, score: 0, counted: 0, dead: 0, deaths: 0, kills: 0, churches: 0, byAnimal: {}, zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0 };
+  return { explored: 0, fields: 0, cropBy: {}, driven: 0, stint: 0, bestStint: 0, score: 0, counted: 0, dead: 0, deaths: 0, kills: 0, churches: 0, byAnimal: {}, zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0, volvoKind: {} };
 }
 
 // A location saved with a sighting, if it looks sane.
@@ -268,10 +326,10 @@ function buildState(events, seenIds) {
   const visit = (trip, key, e, pid) => {
     let h = realm.hexes[key];
     if (!h) {
-      h = realm.hexes[key] = { key, counts: {}, kinds: {}, owner: null, terrain: null, building: null, first: e.ts, trips: new Set(), spotted: false };
+      h = realm.hexes[key] = { key, counts: {}, kinds: {}, owner: null, terrain: null, building: null, first: e.ts, trips: new Set(), spotted: false, farm: false, farmers: {}, monastery: null };
       if (!realm.home) realm.home = key;
       const km = hexKm(realm.home, key);
-      for (const p of trip.players) {
+      for (const p of trip.aboard) {
         const l = life(p);
         l.explore.tiles++;
         l.explore.farthest = Math.max(l.explore.farthest, km);
@@ -282,7 +340,7 @@ function buildState(events, seenIds) {
     if (pid) h.spotted = true;
     if (!h.trips.has(trip.id)) {
       h.trips.add(trip.id);
-      for (const p of trip.players) life(p).explore.mostVisits = Math.max(life(p).explore.mostVisits, h.trips.size);
+      for (const p of trip.aboard) life(p).explore.mostVisits = Math.max(life(p).explore.mostVisits, h.trips.size);
     }
     trip.hexHits.add(key);
     return h;
@@ -290,7 +348,7 @@ function buildState(events, seenIds) {
   // Checks and returns the trip and player an in-trip event is about.
   const inTrip = d => {
     const trip = st.trips[d.trip];
-    if (!trip || trip.end || !trip.players.includes(d.player)) return null;
+    if (!trip || trip.end || !trip.aboard.has(d.player)) return null;
     return { trip, tp: trip.by[d.player], l: life(d.player) };
   };
   const count = d => {
@@ -308,13 +366,19 @@ function buildState(events, seenIds) {
       return leaders.includes(holder) ? holder : leaders.length === 1 ? leaders[0] : null;
     };
     realm.land = {};
+    realm.farms = farmRegions(realm);
     for (const h of Object.values(realm.hexes)) if (h.owner) realm.land[h.owner] = (realm.land[h.owner] || 0) + 1;
     for (const p of pids) realm.roadLength[p] = longestRoad(realm.roads, p);
     realm.longest = best(realm.roadLength, LONGEST_ROAD_MIN, realm.longest);
     realm.biggest = best(realm.land, BIGGEST_LAND_MIN, realm.biggest);
     for (const p of pids) {
       let pts = 0;
-      for (const h of Object.values(realm.hexes)) if (h.building && h.building.player === p) pts += BUILDINGS[h.building.kind].points;
+      for (const h of Object.values(realm.hexes)) {
+        if (h.building && h.building.player === p) pts += BUILDINGS[h.building.kind].points;
+        if (h.monastery && h.monastery.complete && h.monastery.player === p) pts += 1;
+      }
+      // A farm's owners score 1 for every city it feeds, like Carcassonne farmers.
+      for (const f of realm.farms) if (f.owners.includes(p)) pts += f.cities;
       if (realm.longest === p) pts += BONUS_POINTS;
       if (realm.biggest === p) pts += BONUS_POINTS;
       realm.points[p] = pts;
@@ -342,7 +406,9 @@ function buildState(events, seenIds) {
       case 'trip.start': {
         if (!d.id || st.trips[d.id]) break;
         const players = [...new Set(d.players || [])].filter(pid => st.players[pid]).slice(0, MAX_PLAYERS);
-        const trip = { id: d.id, name: String(d.name || 'Road trip'), players, start: e.ts, end: null, by: {}, plates: {}, pins: [], winners: {}, awards: [], badgesAtEnd: {}, earned: {}, paid: {}, hexHits: new Set(), steals: [] };
+        const trip = { id: d.id, name: String(d.name || 'Road trip'), players, aboard: new Set(players), start: e.ts, end: null, by: {}, plates: {}, pins: [], winners: {}, awards: [], badgesAtEnd: {}, earned: {}, paid: {}, wage: {}, hexHits: new Set(), steals: [],
+          driver: players.includes(d.driver) ? d.driver : null, legs: [], swaps: 0, km: 0, track: [], lastTrack: null };
+        trip.legs.push({ player: trip.driver, ts: e.ts });
         st.trips[d.id] = trip;
         st.tripOrder.push(d.id);
         for (const pid of players) {
@@ -350,6 +416,64 @@ function buildState(events, seenIds) {
           life(pid).trips++;
           award(pid, { trip, tp: trip.by[pid] }, e);
         }
+        break;
+      }
+      // Someone hops in or out of the car at a stop. They only play while aboard.
+      case 'trip.crew': {
+        const trip = st.trips[d.trip];
+        if (!trip || trip.end || !st.players[d.player]) break;
+        if (d.aboard) {
+          if (trip.aboard.has(d.player) || trip.aboard.size >= MAX_PLAYERS) break;
+          trip.aboard.add(d.player);
+          if (!trip.by[d.player]) {
+            trip.players.push(d.player);
+            trip.by[d.player] = emptyTripPlayer();
+            life(d.player).trips++;
+            award(d.player, { trip, tp: trip.by[d.player] }, e);
+          }
+        } else {
+          if (!trip.aboard.has(d.player)) break;
+          trip.aboard.delete(d.player);
+          if (trip.driver === d.player) { trip.driver = null; trip.legs.push({ player: null, ts: e.ts }); }
+        }
+        break;
+      }
+      // A new driver: a player in the car, or null for someone not playing.
+      case 'trip.driver': {
+        const trip = st.trips[d.trip];
+        const pid = d.player && trip && trip.aboard.has(d.player) ? d.player : null;
+        if (!trip || trip.end || (d.player && !pid) || trip.driver === pid) break;
+        trip.driver = pid;
+        trip.swaps++;
+        trip.legs.push({ player: pid, ts: e.ts });
+        if (pid) trip.by[pid].stint = 0;
+        for (const p of trip.aboard) award(p, { trip, tp: trip.by[p] }, e);
+        break;
+      }
+      // A GPS spot saved about every half a kilometre: the route, the distance
+      // and who drove it, and the tiles driven through.
+      case 'trip.track': {
+        const trip = st.trips[d.trip], loc = cleanLoc(d.loc);
+        if (!trip || trip.end || !loc) break;
+        const km = trip.lastTrack ? kmBetween(trip.lastTrack, loc) : 0;
+        if (km > 0 && km < MAX_HOP_KM) {
+          trip.km += km;
+          const pid = trip.driver;
+          if (pid) {
+            const tp = trip.by[pid], l = life(pid), t = day(e.ts);
+            if (!tp.driven) l.drive.trips++;
+            tp.driven += km;
+            tp.stint += km;
+            tp.bestStint = Math.max(tp.bestStint, tp.stint);
+            l.drive.km += km;
+            l.drive.bestStint = Math.max(l.drive.bestStint, tp.stint);
+            if (t.h >= 21 || t.h < 5) l.drive.night += km;
+          }
+        }
+        trip.lastTrack = loc;
+        trip.track.push([loc.lat, loc.lon]);
+        visit(trip, hexAt(loc.lat, loc.lon), e, null);
+        for (const pid of trip.aboard) award(pid, { trip, tp: trip.by[pid] }, e);
         break;
       }
       case 'trip.end': {
@@ -366,13 +490,41 @@ function buildState(events, seenIds) {
           }
         }
         // Realm payday: resources for the trip's sightings, one of each for
-        // coming along, and a harvest from settled hexes someone drove through.
+        // coming along, the driver's wage, a harvest from settled hexes someone
+        // drove through, grain from farms, and gold from monasteries.
+        const sighted = {};
         for (const pid of trip.players) {
-          const got = emptyPurse(), seen = trip.earned[pid] || emptyPurse();
+          const seen = trip.earned[pid] || emptyPurse();
+          sighted[pid] = RESOURCES.reduce((n, r) => n + Math.floor(seen[r.id] / EARN_EVERY[r.id]), 0);
+        }
+        const farms = farmRegions(realm);
+        for (const pid of trip.players) {
+          const got = emptyPurse(), seen = trip.earned[pid] || emptyPurse(), tp = trip.by[pid];
           for (const r of RESOURCES) got[r.id] = Math.floor(seen[r.id] / EARN_EVERY[r.id]) + 1;
+          // The driver can't spot much, so they're paid by the km, and never
+          // less than the passengers' average for the share of the trip they drove.
+          const others = trip.players.filter(p => p !== pid);
+          const wage = Math.floor(tp.driven / WAGE_KM);
+          let topup = 0;
+          if (tp.driven > 0 && trip.km > 0 && others.length) {
+            const avg = others.reduce((n, p) => n + sighted[p], 0) / others.length;
+            topup = Math.max(0, Math.floor(avg * Math.min(1, tp.driven / trip.km)) - sighted[pid]);
+          }
+          for (let i = 0; i < wage + topup; i++) got[WAGE_ORDER[i % WAGE_ORDER.length]]++;
+          trip.wage[pid] = { wage, topup };
+          life(pid).realm.wage += wage + topup;
           for (const key of trip.hexHits) {
             const b = realm.hexes[key].building, t = realm.hexes[key].terrain;
             if (b && b.player === pid && t) { const n = b.kind === 'city' ? 2 : 1; got[t] += n; life(pid).realm.harvested += n; }
+          }
+          for (const f of farms) if (f.owners.includes(pid)) got.grain += f.fed;
+          // A monastery pays out after a trip that passes through its tile.
+          for (const key of trip.hexHits) {
+            const h = realm.hexes[key], m = h.monastery;
+            if (!m || m.player !== pid) continue;
+            const ring = hexNeighbors(h.key).filter(k => realm.hexes[k]).length;
+            got.gold += ring;
+            if (ring === 6 && !m.complete) { m.complete = true; got.gold += MONASTERY_BONUS; life(pid).realm.completed++; }
           }
           pay(purse(pid), got, 1);
           trip.paid[pid] = got;
@@ -418,7 +570,8 @@ function buildState(events, seenIds) {
       case 'flock.cemetery': {
         const x = inTrip(d);
         if (!x) break;
-        const victims = [...new Set(d.victims || [])].filter(v => x.trip.players.includes(v));
+        // The driver's flock is safe: they can't watch for churches.
+        const victims = [...new Set(d.victims || [])].filter(v => x.trip.aboard.has(v) && v !== x.trip.driver);
         let killed = 0;
         for (const v of victims) {
           const vt = x.trip.by[v], vl = life(v);
@@ -465,6 +618,9 @@ function buildState(events, seenIds) {
         x.l.biggestRaise = Math.max(x.l.biggestRaise, n);
         pin(x.trip, e, 'church', `Church: ${n} brought back`, '⛪', d.player);
         earn(x.trip, d.player, 'lumber');
+        // The first church in a tile nobody has built in founds a monastery there.
+        const cl = cleanLoc(d.loc), ch = cl && realm.hexes[hexAt(cl.lat, cl.lon)];
+        if (ch && !ch.monastery && !ch.building) { ch.monastery = { player: d.player, ts: e.ts, complete: false }; x.l.realm.monasteries++; }
         award(d.player, x, e);
         break;
       }
@@ -481,9 +637,36 @@ function buildState(events, seenIds) {
         award(d.player, x, e);
         break;
       }
+      case 'field.add': {
+        const x = inTrip(d);
+        if (!x) break;
+        const crop = CROPS.find(c => c.id === d.crop) || CROPS[0];
+        x.tp.fields++;
+        x.tp.cropBy[crop.id] = (x.tp.cropBy[crop.id] || 0) + 1;
+        x.l.fields++;
+        x.l.cropBy[crop.id] = (x.l.cropBy[crop.id] || 0) + 1;
+        pin(x.trip, e, 'field', `${crop.name} field`, crop.icon, d.player);
+        // A field puts the spotter's farmer on that tile.
+        const fl = cleanLoc(d.loc), fh = fl && realm.hexes[hexAt(fl.lat, fl.lon)];
+        if (fh) { fh.farm = true; fh.farmers[d.player] = (fh.farmers[d.player] || 0) + 1; realm.farms = farmRegions(realm); }
+        earn(x.trip, d.player, cropRes(crop.id));
+        award(d.player, x, e);
+        break;
+      }
       case 'volvo.add': {
         const x = inTrip(d);
         if (!x) break;
+        const other = VOLVO_OTHERS.find(k => k.id === d.kind);
+        if (other) {
+          x.tp.volvoKind[other.id] = (x.tp.volvoKind[other.id] || 0) + 1;
+          x.l.volvoKind[other.id] = (x.l.volvoKind[other.id] || 0) + 1;
+          x.tp.volvoPoints += other.points;
+          x.l.volvoPoints += other.points;
+          pin(x.trip, e, 'volvo', other.name, other.icon, d.player);
+          earn(x.trip, d.player, 'ore', other.points);
+          award(d.player, x, e);
+          break;
+        }
         const color = VOLVO_COLORS.some(c => c.id === d.color) ? d.color : 'other';
         x.tp.volvos++;
         x.tp.volvoBy[color] = (x.tp.volvoBy[color] || 0) + 1;
@@ -504,7 +687,7 @@ function buildState(events, seenIds) {
         if (!trip || trip.end || !PLATES[d.plate] || trip.plates[d.plate]) break;
         trip.plates[d.plate] = { ts: e.ts, event: e.id };
         pin(trip, e, 'plate', `${PLATES[d.plate].name} plate`, '🚗', null);
-        for (const pid of trip.players) {
+        for (const pid of trip.aboard) {
           earn(trip, pid, 'grain');
           life(pid).uniquePlates.add(d.plate);
           award(pid, { trip, tp: trip.by[pid] }, e);
@@ -516,12 +699,14 @@ function buildState(events, seenIds) {
         const trip = st.trips[d.trip], loc = cleanLoc(d.loc);
         if (!trip || trip.end || !loc) break;
         visit(trip, hexAt(loc.lat, loc.lon), e, null);
-        for (const pid of trip.players) award(pid, { trip, tp: trip.by[pid] }, e);
+        for (const pid of trip.aboard) award(pid, { trip, tp: trip.by[pid] }, e);
         break;
       }
+      // Builds name tiles, so ones made on an older, bigger grid no longer
+      // fit the map. They're skipped, which hands back what they cost.
       case 'realm.build': {
         const pid = d.player, kind = d.kind, b = BUILDINGS[kind];
-        if (!st.players[pid] || !b || !realmMayPlay(realm, pid) || !canPay(purse(pid), b.cost)) break;
+        if (d.grid !== GRID || !st.players[pid] || !b || !realmMayPlay(realm, pid) || !canPay(purse(pid), b.cost)) break;
         if (kind === 'road') {
           if (!canRoad(realm, pid, d.hex, d.to)) break;
           realm.roads[roadKey(d.hex, d.to)] = { player: pid, ts: e.ts };
@@ -545,12 +730,21 @@ function buildState(events, seenIds) {
         if (!st.players[d.player] || !realmMayPlay(realm, d.player) || !Object.keys(give).length || !Object.keys(get).length) break;
         if (d.with === 'bank') {
           const [gk, gn] = Object.entries(give)[0], [wk, wn] = Object.entries(get)[0];
-          if (Object.keys(give).length !== 1 || Object.keys(get).length !== 1 || gk === wk || gn !== BANK_RATE * wn || !canPay(purse(d.player), give)) break;
+          if (Object.keys(give).length !== 1 || Object.keys(get).length !== 1 || gk === wk || gk === 'gold' || wk === 'gold' || gn !== BANK_RATE * wn || !canPay(purse(d.player), give)) break;
         } else if (!st.players[d.with] || d.with === d.player || !canPay(purse(d.player), give) || !canPay(purse(d.with), get)) break;
         pay(purse(d.player), give); pay(purse(d.player), get, 1);
         if (d.with !== 'bank') { pay(purse(d.with), get); pay(purse(d.with), give, 1); life(d.player).realm.trades++; life(d.with).realm.trades++; award(d.with, {}, e); }
         else life(d.player).realm.bank++;
         award(d.player, {}, e);
+        break;
+      }
+      // Gold from monasteries buys any resource.
+      case 'realm.buy': {
+        const pid = d.player, n = Math.floor(Number(d.n) || 1);
+        if (!st.players[pid] || !realmMayPlay(realm, pid) || !RESOURCES.some(r => r.id === d.res) || n < 1 || n > 99 || purse(pid).gold < GOLD_PRICE * n) break;
+        purse(pid).gold -= GOLD_PRICE * n;
+        purse(pid)[d.res] += n;
+        award(pid, {}, e);
         break;
       }
       // The player whose turn it is hands the dice on.
@@ -567,7 +761,7 @@ function buildState(events, seenIds) {
   }
 
   realmScore();
-  for (const t of Object.values(st.trips)) t.hexHits = [...t.hexHits];
+  for (const t of Object.values(st.trips)) { t.hexHits = [...t.hexHits]; t.aboard = [...t.aboard]; }
   for (const h of Object.values(realm.hexes)) h.visits = h.trips.size;
 
   // The newest trip that hasn't been ended is the one being played.
@@ -590,11 +784,11 @@ const RESOURCES = [
   { id: 'wool', name: 'Wool', icon: '🐑', from: 'flocks' },
   { id: 'brick', name: 'Bricks', icon: '🧱', from: 'zombies' },
   { id: 'ore', name: 'Ore', icon: '⛏️', from: 'Volvo points' },
-  { id: 'grain', name: 'Grain', icon: '🌾', from: 'plates' },
-  { id: 'lumber', name: 'Lumber', icon: '🪵', from: 'cemeteries and churches' },
+  { id: 'grain', name: 'Grain', icon: '🌾', from: 'plates and fields' },
+  { id: 'lumber', name: 'Lumber', icon: '🪵', from: 'cemeteries, churches, orchards and vineyards' },
 ];
 // What each kind of sighting is worth, and the terrain a hex full of them becomes.
-const PIN_RESOURCE = { flock: 'wool', zombie: 'brick', volvo: 'ore', plate: 'grain', cemetery: 'lumber', church: 'lumber' };
+const PIN_RESOURCE = { flock: 'wool', zombie: 'brick', volvo: 'ore', plate: 'grain', field: 'grain', cemetery: 'lumber', church: 'lumber' };
 const TERRAIN = { wool: '🌿 Pasture', brick: '🧱 Hills', ore: '⛰️ Mountains', grain: '🌾 Fields', lumber: '🌲 Forest' };
 const BUILDINGS = {
   road: { name: 'Road', icon: '🛣️', cost: { brick: 1, lumber: 1 } },
@@ -602,12 +796,20 @@ const BUILDINGS = {
   city: { name: 'City', icon: '🏰', points: 2, cost: { grain: 2, ore: 3 } },
 };
 const BANK_RATE = 4;
-const LONGEST_ROAD_MIN = 5, BIGGEST_LAND_MIN = 3, BONUS_POINTS = 2;
+const LONGEST_ROAD_MIN = 7, BIGGEST_LAND_MIN = 5, BONUS_POINTS = 2;
+// Gold comes from monasteries: 1 for each visited tile around one, after
+// every trip through it, and a bonus once all six are visited. It buys any resource.
+const GOLD_PRICE = 2, MONASTERY_BONUS = 3;
+// The driver's wage: one resource for every WAGE_KM driven, taking turns.
+const WAGE_KM = 50, WAGE_ORDER = ['brick', 'lumber', 'ore', 'grain', 'wool'];
+// A gap between GPS spots longer than this is a glitch, not driving.
+const MAX_HOP_KM = 300;
 // Sightings per resource, paid out at the end of a trip, plus one of each for taking part.
 const EARN_EVERY = { wool: 3, brick: 2, ore: 3, grain: 4, lumber: 1 };
 
-// Pointy-top hexes about 20 km across, on a simple flat projection of the map.
-const HEX = 0.18, HEX_LAT0 = Math.cos(40 * Math.PI / 180);
+// Pointy-top hexes about 10 km across, on a simple flat projection of the map.
+// GRID goes up whenever HEX changes, so builds on the old tiles are dropped.
+const HEX = 0.09, GRID = 2, HEX_LAT0 = Math.cos(40 * Math.PI / 180);
 function hexAt(lat, lon) {
   const x = lon * HEX_LAT0, y = lat;
   let q = (Math.sqrt(3) / 3 * x - y / 3) / HEX, r = (2 / 3 * y) / HEX, z = -q - r;
@@ -631,33 +833,70 @@ function hexNeighbors(key) {
   const [q, r] = key.split(',').map(Number);
   return HEX_DIRS.map(([dq, dr]) => (q + dq) + ',' + (r + dr));
 }
-// Distance between two hex centres, in km.
+// Distance between two places, and between two hex centres, in km.
+function kmBetween(a, b) {
+  const rad = Math.PI / 180;
+  const h = Math.sin((b.lat - a.lat) * rad / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin((b.lon - a.lon) * rad / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
 function hexKm(a, b) {
-  const [la1, lo1] = hexCorners(a).center, [la2, lo2] = hexCorners(b).center, rad = Math.PI / 180;
-  const h = Math.sin((la2 - la1) * rad / 2) ** 2 + Math.cos(la1 * rad) * Math.cos(la2 * rad) * Math.sin((lo2 - lo1) * rad / 2) ** 2;
-  return Math.round(2 * 6371 * Math.asin(Math.sqrt(h)));
+  const [la1, lo1] = hexCorners(a).center, [la2, lo2] = hexCorners(b).center;
+  return Math.round(kmBetween({ lat: la1, lon: lo1 }, { lat: la2, lon: lo2 }));
+}
+// Farms, like Carcassonne's fields: tiles with a field spotted in them join up
+// with their neighbours. Whoever has the most farmers in a farm owns it (ties
+// share), and it feeds every settlement and city on it or next to it.
+function farmRegions(realm) {
+  const seen = new Set(), out = [];
+  for (const start of Object.keys(realm.hexes)) {
+    if (seen.has(start) || !realm.hexes[start].farm) continue;
+    const hexes = [], todo = [start], farmers = {};
+    seen.add(start);
+    while (todo.length) {
+      const k = todo.pop();
+      hexes.push(k);
+      for (const [p, n] of Object.entries(realm.hexes[k].farmers)) farmers[p] = (farmers[p] || 0) + n;
+      for (const n of hexNeighbors(k)) if (!seen.has(n) && realm.hexes[n] && realm.hexes[n].farm) { seen.add(n); todo.push(n); }
+    }
+    const top = Math.max(0, ...Object.values(farmers));
+    const owners = top ? Object.keys(farmers).filter(p => farmers[p] === top) : [];
+    const near = new Set(hexes);
+    for (const k of hexes) for (const n of hexNeighbors(k)) near.add(n);
+    let settlements = 0, cities = 0;
+    for (const k of near) { const b = realm.hexes[k] && realm.hexes[k].building; if (b) b.kind === 'city' ? cities++ : settlements++; }
+    out.push({ hexes: hexes.sort(), farmers, owners, settlements, cities, fed: settlements + cities });
+  }
+  return out;
 }
 // Explorer score: 1 for every tile the family had never been to, reached with
 // this player in the car, plus 2 more for each one they pioneered (spotted
 // something there first). Ranks go by the score.
 const exploreScore = x => x.tiles + 2 * x.pioneered;
-const EXPLORE_RANKS = [[0, 'Homebody'], [5, 'Day Tripper'], [15, 'Scout'], [40, 'Pathfinder'], [80, 'Voyager'], [150, 'Explorer'], [300, 'Cartographer'], [600, 'Legend of the Road']];
+const EXPLORE_RANKS = [[0, 'Homebody'], [10, 'Day Tripper'], [30, 'Scout'], [80, 'Pathfinder'], [160, 'Voyager'], [300, 'Explorer'], [600, 'Cartographer'], [1200, 'Legend of the Road']];
+// Driver ranks go by km driven over all trips.
+const DRIVE_RANKS = [[0, 'Learner\'s Permit'], [25, 'Licensed'], [150, 'Road Captain'], [500, 'Long Hauler'], [1500, 'Road Warrior'], [5000, 'Legend of the Highway']];
+function driveRank(km) {
+  let i = 0;
+  while (i + 1 < DRIVE_RANKS.length && km >= DRIVE_RANKS[i + 1][0]) i++;
+  return { title: DRIVE_RANKS[i][1], from: DRIVE_RANKS[i][0], next: DRIVE_RANKS[i + 1] ? { km: DRIVE_RANKS[i + 1][0], title: DRIVE_RANKS[i + 1][1] } : null };
+}
 function exploreRank(tiles) {
   let i = 0;
   while (i + 1 < EXPLORE_RANKS.length && tiles >= EXPLORE_RANKS[i + 1][0]) i++;
   return { title: EXPLORE_RANKS[i][1], from: EXPLORE_RANKS[i][0], next: EXPLORE_RANKS[i + 1] ? { tiles: EXPLORE_RANKS[i + 1][0], title: EXPLORE_RANKS[i + 1][1] } : null };
 }
 const roadKey = (a, b) => a < b ? a + '|' + b : b + '|' + a;
-const emptyPurse = () => Object.fromEntries(RESOURCES.map(r => [r.id, 0]));
+// A purse holds the five resources plus gold (which the robber can't take).
+const emptyPurse = () => ({ ...Object.fromEntries(RESOURCES.map(r => [r.id, 0])), gold: 0 });
 const canPay = (purse, cost) => Object.entries(cost).every(([k, n]) => (purse[k] || 0) >= n);
 const pay = (purse, cost, sign = -1) => { for (const [k, n] of Object.entries(cost)) purse[k] = (purse[k] || 0) + sign * n; };
 function cleanBundle(b) {
   const out = {};
-  for (const r of RESOURCES) { const n = Math.floor(Number(b && b[r.id]) || 0); if (n > 0 && n < 1000) out[r.id] = n; }
+  for (const k of [...RESOURCES.map(r => r.id), 'gold']) { const n = Math.floor(Number(b && b[k]) || 0); if (n > 0 && n < 1000) out[k] = n; }
   return out;
 }
 
-function emptyRealm() { return { home: null, hexes: {}, roads: {}, purse: {}, points: {}, roadLength: {}, land: {}, longest: null, biggest: null, turn: null }; }
+function emptyRealm() { return { home: null, hexes: {}, roads: {}, purse: {}, points: {}, roadLength: {}, land: {}, farms: [], longest: null, biggest: null, turn: null }; }
 
 // Ranks in the Realm go by Realm points.
 const REALM_RANKS = [[0, 'Wanderer'], [1, 'Squire'], [3, 'Knight'], [6, 'Baron'], [10, 'Count'], [15, 'Duke'], [21, 'Monarch']];
@@ -723,7 +962,8 @@ function endorsements(trip, pid, game) {
   if (game === 'flocks') {
     const a = only(tp.byAnimal, ANIMALS);
     if (a) out.push(`With only ${a.name.toLowerCase()}`);
-    if (ANIMALS.every(x => tp.byAnimal[x.id])) out.push('Every animal on the farm');
+    if (FARM_ANIMALS.every(x => tp.byAnimal[x.id])) out.push('Every animal on the farm');
+    if ((tp.byAnimal.deer || 0) >= 5) out.push('Oh deer, so many deer');
     if (tp.deaths === 0 && tp.counted > 0) out.push('Never lost a flock');
     if (tp.deaths > 0) out.push(tp.deaths === 1 ? 'Survived a cemetery' : `Survived ${tp.deaths} cemeteries`);
     if (tp.churches > 0 && tp.deaths > 0) out.push('Saved by a church');
@@ -732,14 +972,24 @@ function endorsements(trip, pid, game) {
   } else if (game === 'zombies') {
     const z = only(tp.zombieBy, ZOMBIES);
     if (z && tp.zombies > 1) out.push(`Nothing but ${z.name.toLowerCase()}`);
-    if (ZOMBIES.every(x => tp.zombieBy[x.id])) out.push('All six kinds');
+    if (ZOMBIES.every(x => tp.zombieBy[x.id])) out.push('All eight kinds');
     if (won('zombies')) margin(contest('zombies'));
   } else if (game === 'volvos') {
     const c = only(tp.volvoBy, VOLVO_COLORS);
     if (c && tp.volvos > 1 && c.id !== 'other') out.push(`Only ${c.name.toLowerCase()} trucks`);
     if (Object.keys(tp.volvoBy).length >= 6) out.push('A rainbow of trucks');
     if (tp.volvoBranded >= 3 && tp.volvoBranded * 2 >= tp.volvos) out.push('Say-it-twice specialist');
+    if (tp.volvoKind.classic) out.push(tp.volvoKind.classic === 1 ? 'Found a classic' : `${tp.volvoKind.classic} classics`);
+    if (['excavator', 'loader', 'hauler'].some(k => tp.volvoKind[k])) out.push('Hard hat zone');
     if (won('volvos')) margin(contest('volvos'));
+  } else if (game === 'fields') {
+    const c = only(tp.cropBy, CROPS);
+    if (c && tp.fields > 1) out.push(`Nothing but ${c.name.toLowerCase()}`);
+    if (CROPS.every(x => tp.cropBy[x.id])) out.push('Every crop in the country');
+    if (won('fields')) margin(contest('fields'));
+  } else if (game === 'drive') {
+    if (tp.driven >= 1) out.push(`Drove ${Math.round(tp.driven)} km`);
+    if (tp.bestStint >= 300) out.push('Marathon stint');
   } else if (game === 'plates') {
     const n = US_STATES.filter(st => trip.plates[st]).length;
     if (n) out.push(`${n} state${n === 1 ? '' : 's'} this trip`);
@@ -753,7 +1003,8 @@ const UNDO_KINDS = {
   flocks: ['flock.add', 'flock.cemetery', 'flock.church', 'flock.wipe'],
   zombies: ['zombie.add'],
   volvos: ['volvo.add'],
-  realm: ['realm.build', 'realm.trade', 'realm.pass'],
+  fields: ['field.add'],
+  realm: ['realm.build', 'realm.trade', 'realm.buy', 'realm.pass'],
 };
 function lastUndoable(events, st, tripId, playerId, game) {
   const kinds = new Set(UNDO_KINDS[game] || Object.values(UNDO_KINDS).flat());
@@ -766,4 +1017,4 @@ function lastUndoable(events, st, tripId, playerId, game) {
   return best;
 }
 
-if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, REALM_RANKS, realmRank, EXPLORE_RANKS, exploreRank, exploreScore, hexKm, realmCurrent, realmMayPlay, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };
+if (typeof module !== 'undefined') module.exports = { FARM_ANIMALS, CROPS, VOLVO_OTHERS, GRID, GOLD_PRICE, MONASTERY_BONUS, WAGE_KM, DRIVE_RANKS, driveRank, kmBetween, farmRegions, ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, REALM_RANKS, realmRank, EXPLORE_RANKS, exploreRank, exploreScore, hexKm, realmCurrent, realmMayPlay, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };

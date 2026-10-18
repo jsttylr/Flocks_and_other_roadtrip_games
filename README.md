@@ -4,14 +4,15 @@
 
 **The car games your family already plays, scored on an iPad and remembered forever.**
 
-Roadtrip Games keeps score for **Flocks**, **Zombie Flocks**, **Volvo trucks** and the **license plate game**. Every sighting is pinned on a map of the trip, and all-time stats pile up across every trip you take.
+Roadtrip Games keeps score for **Flocks**, **Zombie Flocks**, **Volvos**, **Fields** and the **license plate game**. Every sighting is pinned on a map of the trip, and all-time stats pile up across every trip you take.
 
 There's more than the scoreboard:
 
-- **80 awards and player levels**, including awards you can win again on every trip and hidden ones nobody knows about until they're earned.
+- **106 awards and player levels**, including awards you can win again on every trip and hidden ones nobody knows about until they're earned.
 - **Printable certificates** for every award, level and trip, signed by Skippy the Magnificent. They're bright and confetti-filled, and made to be handed to a kid in the back seat.
-- **The Realm**, a game a bit like Settlers of Catan for after the trip. Your sightings claim hexes of the real map, earn resources and build roads, settlements and cities across every trip you take.
-- **Explorer scores** for every new bit of map the car drives through.
+- **The Realm**, a game a bit like Settlers of Catan (with farms and monasteries borrowed from Carcassonne) for after the trip. Your sightings claim hexes of the real map, earn resources and gold, and build roads, settlements and cities across every trip you take.
+- **The driver** gets their due: a wage in the Realm, a shield from cemeteries, driving awards and ranks, with drivers swapped at any stop.
+- **Explorer scores** for every new bit of map the car drives through, and the route drawn on the map.
 
 ![Flocks scoreboard for four players](docs/screenshots/flocks.png)
 
@@ -22,6 +23,7 @@ It's one small program that runs at home on a Windows PC, a Mac, a Raspberry Pi 
 ## Contents
 
 - [The games](#the-games)
+- [The driver and who's in the car](#the-driver-and-whos-in-the-car)
 - [Trip map](#trip-map)
 - [The Realm](#the-realm) and [Explorers](#-explorers)
 - [Stats and awards](#stats-and-awards)
@@ -38,23 +40,31 @@ Up to four players. The switch at the top of the screen flips between the **Comp
 
 ### 🐄 Flocks (competitive)
 
-Count the livestock you see: cows, horses, sheep, goats, chickens, llamas & alpacas, and pigs. Tap the animal, then tap how many.
+Count the animals you see: cows, horses, sheep, goats, chickens, llamas & alpacas, pigs, and live deer. Tap the animal, then tap how many.
 
-- **🪦 Cemetery:** whoever spots one taps **Cemetery** on their own panel and picks whose flocks die. Everyone else is ticked to start with. Those flocks drop to zero.
+- **🪦 Cemetery:** whoever spots one taps **Cemetery** on their own panel and picks whose flocks die. Everyone else is ticked to start with. Those flocks drop to zero. The driver's flock is safe while they drive.
 - **⛪ Church:** whoever spots one taps **Church** on their own panel and gets back everything they've lost to cemeteries since their last church.
 - When you end the trip, the biggest flock wins.
 
 ### 🧟 Zombie Flocks (competitive)
 
-Roadkill makes up your zombie flock: deer, rabbits, squirrels, foxes, raccoons and opossums. One tap counts one. They're already dead, so cemeteries and churches leave them alone. The biggest zombie flock wins the trip.
+Roadkill makes up your zombie flock: deer, rabbits, squirrels, foxes, raccoons, opossums, groundhogs and iguanas (the big lizards all over Puerto Rico). One tap counts one. They're already dead, so cemeteries and churches leave them alone. The biggest zombie flock wins the trip.
 
 ![Zombie flocks](docs/screenshots/zombies.png)
 
-### 🚚 Volvo trucks (competitive)
+### 🚚 Volvos (competitive)
 
-Tap the colour of the Volvo truck, then choose **"Volvo truck blue"** (1 point) or, if VOLVO is written on the cab fairing, **"Volvo truck blue Volvo"** (double, 2 points). The most points wins the trip.
+Tap the colour of the Volvo truck, then choose **"Volvo truck blue"** (1 point) or, if VOLVO is written on the cab fairing, **"Volvo truck blue Volvo"** (double, 2 points).
 
-![Choosing a Volvo truck](docs/screenshots/volvos.png)
+Under **Other Volvos**, one tap counts a **classic Volvo** car (140, 240, 740 or 850 series, 2 points), any newer **Volvo wagon** (1 point), or Volvo construction equipment: an **excavator**, a **wheel loader** or a **dump truck** (2 points each). The most points wins the trip.
+
+![Volvo trucks by colour, and other Volvos](docs/screenshots/volvos.png)
+
+### 🌽 Fields (competitive)
+
+Spot crops: corn, soybeans, wheat, tobacco, cotton, hay, sunflowers, pumpkins, orchards and vineyards. One tap counts one field, and the most fields wins the trip. Each field also puts one of your farmers on that spot of the [Realm](#the-realm), where farms feed towns.
+
+![Fields](docs/screenshots/fields.png)
 
 Each panel's **↩ Undo** takes back that player's last tap in that game.
 
@@ -64,34 +74,57 @@ The whole car plays as one team. Tap a state or province the moment anyone sees 
 
 ![License plates, played together](docs/screenshots/plates.png)
 
+## The driver and who's in the car
+
+The bar above every game shows who's driving and how far they've driven. A passenger taps it to swap drivers at a gas station or rest stop, so the driver never has to touch the iPad. The driver can be a player, or **Someone not playing** (say Grandma drives and only the kids play).
+
+![Choosing the driver and who's in the car](docs/screenshots/car.png)
+
+- **🛡️ Cemetery shield:** while you drive, your flock can't be killed by a cemetery. You can't watch for churches to save it, so it's only fair.
+- **💰 Driver's wage:** driving comes first, so at the end of the trip the driver gets 1 Realm resource for every 50 km driven. They're also topped up to at least the passengers' average for the part of the trip they drove.
+- **🏅 Driving awards and ranks:** 8 awards, such as *Behind the Wheel*, *Wheelman* (50 km on one trip), *Marathon* (300 km without a swap), *Relay Team* (3 swaps on one trip, for everyone in the car), *Night Shift* and *Iron Butt* (1,000 km in total). Lifetime kilometres earn ranks from Learner's Permit to Legend of the Highway, shown under **Stats**.
+- **🚙 Who's in the car:** the same sheet lets someone hop in or out at a stop, like a cousin who rides along for one day. You only play while you're in the car, and you still get paid in the Realm for your part of the trip.
+
+Distance is measured from GPS, so it needs the secure address (see [Setting up the iPad](#setting-up-the-ipad)). The iPad saves a GPS spot about every half a kilometre.
+
+![Driver ranks on the Stats tab](docs/screenshots/drivers.png)
+
 ## Trip map
 
-When the iPad uses the home server's secure address (see [Setting up the iPad](#setting-up-the-ipad)), every cow count, cemetery, church, zombie, Volvo and plate is saved with where it happened. The **Map** tab shows any trip on a free OpenStreetMap map. Pins are coloured by player, and tapping one shows who saw what, and when. With GPS on, the iPad also notes each new map tile the trip drives through, for the [Realm](#the-realm) and [Explorers](#-explorers). Viewing the map needs internet for the map pictures; recording locations doesn't.
+When the iPad uses the home server's secure address (see [Setting up the iPad](#setting-up-the-ipad)), every cow count, cemetery, church, zombie, Volvo, field and plate is saved with where it happened. The **Map** tab shows any trip on a free OpenStreetMap map. Pins are coloured by player, and tapping one shows who saw what, and when. With GPS on, the iPad also saves the route as you drive, so the map draws the road you took and the trip's distance, and counts each map tile you pass through for the [Realm](#the-realm) and [Explorers](#-explorers). Viewing the map needs internet for the map pictures; recording locations doesn't.
 
 ![Trip map](docs/screenshots/map.png)
 
-*(The street map is left out of this screenshot; in the app the pins sit on an OpenStreetMap map.)*
+*(The street map is left out of these screenshots; in the app the pins, route and hexes sit on an OpenStreetMap map.)*
 
 ## The Realm
 
-The game you play after the trip, a bit like Settlers of Catan. Every sighting with a location lands on a hex about 20 km across, laid over the real map. Whoever has spotted the most in a hex holds that territory, and the board grows with every trip you take.
+The game you play after the trip, a bit like Settlers of Catan, with farms and monasteries borrowed from Carcassonne. Every sighting with a location lands on a hex about 10 km across, laid over the real map. Whoever has spotted the most in a hex holds that territory, and the board grows with every trip you take.
 
-- **Payday:** when a trip ends, everyone is paid in resources: 🐑 wool for flocks, 🧱 bricks for zombies, ⛏️ ore for Volvo points, 🌾 grain for plates and 🪵 lumber for cemeteries and churches, plus one of each for coming along.
+- **Payday:** when a trip ends, everyone is paid in resources: 🐑 wool for flocks, 🧱 bricks for zombies, ⛏️ ore for Volvo points, 🌾 grain for plates and fields, and 🪵 lumber for cemeteries, churches, orchards and vineyards, plus one of each for coming along. The driver also gets a [wage](#the-driver-and-whos-in-the-car). Whatever you don't spend stays in your pile for later trips.
 - **The robber:** whoever calls a cemetery takes one resource from each flock they killed.
 - **Build:** roads (🧱🪵), settlements (🧱🪵🐑🌾) and cities (🌾🌾⛏️⛏️⛏️). Settle a hex you hold or one your road reaches, and every later trip through it harvests that hex's resource.
 - **Turns:** after every trip a new round starts, with whoever did worst on the trip going first. On your turn, build and trade, then tap **End turn** and pass the iPad. Rounds keep going until the next trip.
-- **Trade:** on your turn, swap with anyone who agrees, or 4 for 1 with the bank.
-- **Points:** settlement 1, city 2, plus 2 each for **Longest Road** and **Biggest Territory**. Points earn ranks, from Wanderer through Squire, Knight, Baron, Count and Duke to Monarch, and 17 Realm awards count toward your level like every other award.
+- **Trade:** on your turn, swap with anyone who agrees (gold included), or 4 for 1 with the bank.
+- **🌾 Farms:** every field you spot puts one of your farmers on its tile. Farm tiles that touch make one farm, held by whoever has the most farmers in it (ties share), like Carcassonne's farmers. After every trip, a farm pays its holders 1 🌾 for each settlement or city on it or next to it, whoever built them, and every city it feeds is worth a point to them. Farm tiles have a gold dashed border on the map.
+- **⛪ Monasteries and 🪙 gold:** the first church spotted in a tile with nothing built on it founds a monastery for its spotter. After every trip that passes through it, it pays 1 gold for each of the 6 tiles around it the family has visited. Visit all 6 and it's complete: a 3 gold bonus and 1 point. Gold buys any resource for 2, can be traded, and the robber can't steal it.
+- **Points:** settlement 1, city 2, complete monastery 1, each city your farm feeds 1, plus 2 each for **Longest Road** (at least 7 roads) and **Biggest Territory** (at least 5 hexes). Points earn ranks, from Wanderer through Squire, Knight, Baron, Count and Duke to Monarch, and 21 Realm awards count toward your level like every other award.
 
 Open **🏰 Realm**, see whose turn it is, and tap a hex to build. **❓ How to play** has the full rules.
 
 ![Whose turn it is, resources and ranks on the Realm tab](docs/screenshots/realm-tab.png)
 
-![The Realm: territory, roads and settlements on the trip map](docs/screenshots/realm.png)
+![The Realm: territory, roads, settlements, farms and monasteries](docs/screenshots/realm.png)
+
+The **Farms and monasteries** card shows who holds each farm and what each monastery earns:
+
+![Farms and monasteries](docs/screenshots/farms.png)
+
+> **Smaller tiles in version 0.4.0.** Hexes used to be about 20 km across. Every past sighting and drive is re-mapped onto the new tiles automatically. Roads, settlements and cities built on the old tiles can't be moved, so they were taken off the board, and what they cost is back in their builders' piles.
 
 ### 🧭 Explorers
 
-With GPS on, the iPad notes every tile the trip drives through, not just the ones with sightings. Every tile the family has never been to is worth 1 explorer point to everyone in the car, and whoever spots something first in a new tile pioneers it for 2 more. Explorer points earn ranks from Homebody to Legend of the Road, and there are 8 exploring awards, such as *Pioneer*, *Off the Map* (20 new tiles on one trip), *Regulars* and *A Thousand Miles*.
+With GPS on, the iPad notes every tile the trip drives through, not just the ones with sightings. Every tile the family has never been to is worth 1 explorer point to everyone in the car, and whoever spots something first in a new tile pioneers it for 2 more. Explorer points earn ranks from Homebody to Legend of the Road, and there are 8 exploring awards, such as *Pioneer*, *Off the Map* (40 new tiles on one trip), *Regulars* and *A Thousand Miles*.
 
 The **Explorers** card on the Realm tab ranks everyone with medals:
 
@@ -99,14 +132,14 @@ The **Explorers** card on the Realm tab ranks everyone with medals:
 
 ## Stats and awards
 
-**Stats** shows each player's all-time numbers for every game: animals by kind, flocks killed with cemeteries, times their flock died, animals lost and brought back, zombies by kind, and Volvos by colour. It also shows every plate your car has ever found and a list of past trips with each game's winner.
+**Stats** shows each player's all-time numbers for every game: animals by kind, flocks killed with cemeteries, times their flock died, animals lost and brought back, zombies by kind, Volvos by colour and kind, and fields by crop. It also shows every plate your car has ever found, the driver ranks, and a list of past trips with each game's winner and distance.
 
 ![All-time stats](docs/screenshots/stats.png)
 
-**Awards** shows each player's awards, earned or not, with when and on which trip each was won. A pop-up announces each one the moment it's earned. Some favourites: *Grim Reaper*, *Heartbreak* (lose a flock of 100), *Miracle* (a church brings back 100), *Comeback Kid*, *Triple Crown* (win all three games on one trip), *Say It Twice*, *Rainbow Fleet*, *Clean Sweep* (all 50 states on one trip) and *Fifty Club*.
+**Awards** shows each player's awards, earned or not, with when and on which trip each was won. A pop-up announces each one the moment it's earned. Some favourites: *Grim Reaper*, *Heartbreak* (lose a flock of 100), *Miracle* (a church brings back 100), *Comeback Kid*, *Triple Crown* (win all three games on one trip), *Say It Twice*, *The Brick* (a classic Volvo), *Heavy Metal* (Volvo construction equipment), *Harvest Moon* (every crop on one trip), *Clean Sweep* (all 50 states on one trip) and *Fifty Club*.
 
 - **Every-trip awards** (marked ↻) can be won again on every trip, like winning Flocks or a Clean Sweep, and show how many times you've won them.
-- **Hidden awards** stay a mystery until someone earns one. Zombies spotted on certain days know a few of them.
+- **Hidden awards** stay a mystery until someone earns one. Zombies spotted on certain days know a few of them, and so do pumpkins.
 - **Levels:** every award you earn, repeats included, counts toward your level, like the badges on a fitness watch. Level 2 takes 1 award, level 3 takes 3, level 4 takes 6, and so on. Each level needs one more award than the last.
 
 ![Awards](docs/screenshots/awards.png)
@@ -244,7 +277,7 @@ The plain and secure addresses keep separate copies on the iPad, so only switch 
 
 ## For the curious
 
-Every tap is saved as a small "event": a cow counted, a cemetery called, a plate found, a Realm road built or a trade made. The iPad keeps them and sends them home, and the server keeps every one in `events.jsonl` and never changes or deletes them. Scores, stats and awards are all worked out from that list. That means stats, awards and Realm rules added later also count everything you've already played, and undo simply records "ignore that one". Two iPads can play the same trip; each sends what it recorded and picks up what the other did.
+Every tap is saved as a small "event": a cow counted, a cemetery called, a plate found, a driver swapped, a GPS spot on the route, a Realm road built or a trade made. The iPad keeps them and sends them home, and the server keeps every one in `events.jsonl` and never changes or deletes them. Scores, stats and awards are all worked out from that list. That means stats, awards and Realm rules added later also count everything you've already played, and undo simply records "ignore that one". Two iPads can play the same trip; each sends what it recorded and picks up what the other did.
 
 | Option | Docker / Unraid variable | What it does |
 | --- | --- | --- |

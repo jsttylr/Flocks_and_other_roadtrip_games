@@ -1,6 +1,6 @@
 // Keeps a copy of the page on the tablet so it opens with no signal.
 // Only used when the page is reached over https (browsers' rule).
-const CACHE = 'roadtrip-v7';
+const CACHE = 'roadtrip-v8';
 const FILES = ['./', 'index.html', 'style.css', 'games.js', 'app.js', 'icon.svg', 'manifest.json', 'vendor/leaflet.js', 'vendor/leaflet.css'];
 
 self.addEventListener('install', e => {
