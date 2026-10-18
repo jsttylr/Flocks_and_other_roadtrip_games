@@ -4,7 +4,14 @@
 
 **The car games your family already plays, scored on an iPad and remembered forever.**
 
-Roadtrip Games keeps score for **Flocks**, **Zombie Flocks**, **Volvo trucks** and the **license plate game**. Every sighting is pinned on a map of the trip, and all-time stats and awards pile up across every trip you take.
+Roadtrip Games keeps score for **Flocks**, **Zombie Flocks**, **Volvo trucks** and the **license plate game**. Every sighting is pinned on a map of the trip, and all-time stats pile up across every trip you take.
+
+There's more than the scoreboard:
+
+- **80 awards and player levels**, including awards you can win again on every trip and hidden ones nobody knows about until they're earned.
+- **Printable certificates** for every award, level and trip, signed by Skippy the Magnificent. They're bright and confetti-filled, and made to be handed to a kid in the back seat.
+- **The Realm**, a game a bit like Settlers of Catan for after the trip. Your sightings claim hexes of the real map, earn resources and build roads, settlements and cities across every trip you take.
+- **Explorer scores** for every new bit of map the car drives through.
 
 ![Flocks scoreboard for four players](docs/screenshots/flocks.png)
 
@@ -16,9 +23,11 @@ It's one small program that runs at home on a Windows PC, a Mac, a Raspberry Pi 
 
 - [The games](#the-games)
 - [Trip map](#trip-map)
+- [The Realm](#the-realm) and [Explorers](#-explorers)
 - [Stats and awards](#stats-and-awards)
+- [Printable certificates](#printable-certificates)
 - [Night mode](#night-mode)
-- [Installing](#installing): [Windows](#windows), [Docker Compose](#docker-compose), [Unraid](#unraid)
+- [Installing](#installing): [Windows](#windows), [Docker Compose](#docker-compose), [Unraid](#unraid), [Changing the ports](#changing-the-ports)
 - [Setting up the iPad](#setting-up-the-ipad)
 - [Backups](#backups)
 - [For the curious](#for-the-curious)
@@ -51,17 +60,42 @@ Each panel's **↩ Undo** takes back that player's last tap in that game.
 
 ### 🚗 License plates (together)
 
-The whole car plays as one team. Tap a state or province the moment anyone sees it, and the tile shows when you found it. All 50 states, Washington DC and the Canadian provinces and territories are there. Tap a found plate to take it back.
+The whole car plays as one team. Tap a state or province the moment anyone sees it, and the tile shows when you found it. All 50 states, Washington DC, the Canadian provinces and territories, Mexico, Puerto Rico, diplomat plates and US Government plates are there. Tap a found plate to take it back.
 
 ![License plates, played together](docs/screenshots/plates.png)
 
 ## Trip map
 
-When the iPad uses the home server's secure address (see [Setting up the iPad](#setting-up-the-ipad)), every cow count, cemetery, church, zombie, Volvo and plate is saved with where it happened. The **Map** tab shows any trip on a free OpenStreetMap map. Pins are coloured by player, and tapping one shows who saw what, and when. Viewing the map needs internet for the map pictures; recording locations doesn't.
+When the iPad uses the home server's secure address (see [Setting up the iPad](#setting-up-the-ipad)), every cow count, cemetery, church, zombie, Volvo and plate is saved with where it happened. The **Map** tab shows any trip on a free OpenStreetMap map. Pins are coloured by player, and tapping one shows who saw what, and when. With GPS on, the iPad also notes each new map tile the trip drives through, for the [Realm](#the-realm) and [Explorers](#-explorers). Viewing the map needs internet for the map pictures; recording locations doesn't.
 
 ![Trip map](docs/screenshots/map.png)
 
 *(The street map is left out of this screenshot; in the app the pins sit on an OpenStreetMap map.)*
+
+## The Realm
+
+The game you play after the trip, a bit like Settlers of Catan. Every sighting with a location lands on a hex about 20 km across, laid over the real map. Whoever has spotted the most in a hex holds that territory, and the board grows with every trip you take.
+
+- **Payday:** when a trip ends, everyone is paid in resources: 🐑 wool for flocks, 🧱 bricks for zombies, ⛏️ ore for Volvo points, 🌾 grain for plates and 🪵 lumber for cemeteries and churches, plus one of each for coming along.
+- **The robber:** whoever calls a cemetery takes one resource from each flock they killed.
+- **Build:** roads (🧱🪵), settlements (🧱🪵🐑🌾) and cities (🌾🌾⛏️⛏️⛏️). Settle a hex you hold or one your road reaches, and every later trip through it harvests that hex's resource.
+- **Turns:** after every trip a new round starts, with whoever did worst on the trip going first. On your turn, build and trade, then tap **End turn** and pass the iPad. Rounds keep going until the next trip.
+- **Trade:** on your turn, swap with anyone who agrees, or 4 for 1 with the bank.
+- **Points:** settlement 1, city 2, plus 2 each for **Longest Road** and **Biggest Territory**. Points earn ranks, from Wanderer through Squire, Knight, Baron, Count and Duke to Monarch, and 17 Realm awards count toward your level like every other award.
+
+Open **🏰 Realm**, see whose turn it is, and tap a hex to build. **❓ How to play** has the full rules.
+
+![Whose turn it is, resources and ranks on the Realm tab](docs/screenshots/realm-tab.png)
+
+![The Realm: territory, roads and settlements on the trip map](docs/screenshots/realm.png)
+
+### 🧭 Explorers
+
+With GPS on, the iPad notes every tile the trip drives through, not just the ones with sightings. Every tile the family has never been to is worth 1 explorer point to everyone in the car, and whoever spots something first in a new tile pioneers it for 2 more. Explorer points earn ranks from Homebody to Legend of the Road, and there are 8 exploring awards, such as *Pioneer*, *Off the Map* (20 new tiles on one trip), *Regulars* and *A Thousand Miles*.
+
+The **Explorers** card on the Realm tab ranks everyone with medals:
+
+![Explorers leaderboard](docs/screenshots/explorers.png)
 
 ## Stats and awards
 
@@ -69,9 +103,21 @@ When the iPad uses the home server's secure address (see [Setting up the iPad](#
 
 ![All-time stats](docs/screenshots/stats.png)
 
-**Awards** shows all 36 awards for each player, earned or not, with when and on which trip each was won. A pop-up announces each one the moment it's earned. Some favourites: *Grim Reaper*, *Heartbreak* (lose a flock of 100), *Hallelujah*, *Miracle* (a church brings back 100), *Comeback Kid*, *Zombie Zoo*, *Say It Twice*, *Rainbow Fleet*, *Coast to Coast* and *Fifty Club*.
+**Awards** shows each player's awards, earned or not, with when and on which trip each was won. A pop-up announces each one the moment it's earned. Some favourites: *Grim Reaper*, *Heartbreak* (lose a flock of 100), *Miracle* (a church brings back 100), *Comeback Kid*, *Triple Crown* (win all three games on one trip), *Say It Twice*, *Rainbow Fleet*, *Clean Sweep* (all 50 states on one trip) and *Fifty Club*.
+
+- **Every-trip awards** (marked ↻) can be won again on every trip, like winning Flocks or a Clean Sweep, and show how many times you've won them.
+- **Hidden awards** stay a mystery until someone earns one. Zombies spotted on certain days know a few of them.
+- **Levels:** every award you earn, repeats included, counts toward your level, like the badges on a fitness watch. Level 2 takes 1 award, level 3 takes 3, level 4 takes 6, and so on. Each level needs one more award than the last.
 
 ![Awards](docs/screenshots/awards.png)
+
+### Printable certificates
+
+Every earned award, every level and every finished trip has a certificate to print or save as a PDF, the kind of thing kids love to get handed at the end of a trip. Tap an earned award under **Awards**, **🎓 Level certificate** next to a player's level, or **🎓 Certificates** next to a trip under **Stats** (the same list opens by itself when you end a trip). Then tap **Print or save as PDF**. On the iPad, choose a printer, or pinch outward on the preview and use Share to save the PDF.
+
+Certificates add little ribbons for how the game was won, like *With only cows*, *Never lost a flock*, *Survived 2 cemeteries* or *By a landslide*. A trip certificate shows the player's scores and medals and every award they earned on that trip. Each one carries the player's level seal and is signed by **Skippy the Magnificent, Chief Road Trip Officer**, with a blank line for the grown-up in charge. Change the name and title under **⚙️ Trips & players**.
+
+![A Flock Champion certificate](docs/screenshots/certificate.png)
 
 ## Night mode
 
@@ -145,7 +191,7 @@ Unraid can install it from a template, so you don't have to type the settings yo
 2. From another computer, open the Unraid flash share (`\\tower\flash` on Windows, `smb://tower/flash` on a Mac), and copy the file into `config/plugins/dockerMan/templates-user/`, renamed `my-roadtrip-games.xml`. (If the flash drive isn't shared, turn it on under **Main**, **Flash**, **SMB Security Settings**, or use the terminal command above.)
 3. In the Unraid web page, open the **Docker** tab, click **Add Container**, and pick **roadtrip-games** from the **Template** list under *User templates*.
 4. Check the settings:
-   - **Web page** `8070` and **Secure web page (GPS)** `8443`. Change the left-hand numbers only if something else already uses them.
+   - **Web page** `8070` and **Secure web page (GPS)** `8443`. If something else already uses them, see [Changing the ports](#changing-the-ports).
    - **Game history** `/mnt/user/appdata/roadtrip-games`, where every trip is kept.
    - **Server address for the iPad**: your Unraid server's IP address (shown at the top of the Unraid page), plus `tower.local` or your server's name. If you reach home with Unraid's built-in WireGuard and the iPad uses a different address over the tunnel, add that too, separated by a comma.
 5. Click **Apply**. When it's running, click the container's icon and choose **WebUI** to open it, then carry on with [Setting up the iPad](#setting-up-the-ipad).
@@ -153,6 +199,16 @@ Unraid can install it from a template, so you don't have to type the settings yo
 To update, use **Check for Updates** on the Docker tab, then **Apply Update**. Include `/mnt/user/appdata/roadtrip-games` in your appdata backups.
 
 With no template, **Add Container** works by hand: Repository `ghcr.io/jsttylr/flocks_and_other_roadtrip_games:main`, Network type `bridge`, then **Add another Path, Port, Variable** for port 8070, port 8443, path `/data` → `/mnt/user/appdata/roadtrip-games`, and variable `ROADTRIP_HOSTS` → your server's address.
+
+### Changing the ports
+
+If 8070 or 8443 is already taken, pick any free numbers, for example 9070 and 9443. Change them in both places, and tell the program, so the setup steps on the iPad show the right secure address:
+
+- **Docker Compose:** `ports:` becomes `"9070:9070"` and `"9443:9443"`, and add `ROADTRIP_PORT=9070` and `ROADTRIP_HTTPS_PORT=9443` under `environment:`.
+- **Unraid:** set both the host and container port of each port setting to the new numbers, then **Add another Path, Port, Variable** for `ROADTRIP_PORT` and `ROADTRIP_HTTPS_PORT`.
+- **Windows:** start it with `roadtrip-games.exe -port 9070 -https-port 9443`.
+
+If only the left-hand (host) number changes, the app still works, but the iPad setup card will show the secure address with the old port.
 
 ## Setting up the iPad
 
@@ -165,12 +221,18 @@ Do this once, at home on your Wi-Fi.
 
    - Tap **Download the home certificate**, then **Allow**.
    - Open **Settings**, tap **Profile Downloaded** near the top, then **Install**.
-   - Go to **Settings, General, About, Certificate Trust Settings** and switch on **Roadtrip Games at home**.
+   - Go to **Settings, General, About, Certificate Trust Settings** and switch on **Roadtrip Games at home**. **Don't skip this one.** Installing the profile alone isn't enough: until this switch is on, Safari still shows a certificate warning and won't open the secure address.
    - Open the secure address it lists, for example `https://192.168.1.50:8443`, and allow location when Safari asks.
    - Add it to the home screen (the Share button, then **Add to Home Screen**) and use that icon from now on.
 3. Add the players and start a trip.
 
 **Why the certificate?** Safari only gives a web page the iPad's GPS when the page is on a secure (https) address. The program makes its own certificate the first time it runs, just for your home server, and the iPad is told to trust it once. As a bonus, the secure address lets the iPad keep a copy of the page, so the app opens even with no signal.
+
+**Still getting a certificate warning?** Don't tap past it; Safari won't share GPS with a page it doesn't trust, and often won't load it at all. Check these instead:
+
+- The **Certificate Trust Settings** switch above is on.
+- The address you typed is listed in `ROADTRIP_HOSTS` (Docker and Unraid), letter for letter. After changing that setting, restart the container so it makes a new certificate. The iPad doesn't need to trust anything again.
+- The address starts with `https://` and uses the secure port (8443), not the plain one.
 
 **In the car:** keep the VPN on so the iPad can reach home over cell. The badge at the top says **Saved at home** when everything has been sent, or how many things are waiting. Anything waiting goes the next time the iPad reaches home.
 
@@ -182,7 +244,7 @@ The plain and secure addresses keep separate copies on the iPad, so only switch 
 
 ## For the curious
 
-Every tap is saved as a small "event": a cow counted, a cemetery called, a plate found. The iPad keeps them and sends them home, and the server keeps every one in `events.jsonl` and never changes or deletes them. Scores, stats and awards are all worked out from that list. That means stats or awards added later also count everything you've already played, and undo simply records "ignore that one". Two iPads can play the same trip; each sends what it recorded and picks up what the other did.
+Every tap is saved as a small "event": a cow counted, a cemetery called, a plate found, a Realm road built or a trade made. The iPad keeps them and sends them home, and the server keeps every one in `events.jsonl` and never changes or deletes them. Scores, stats and awards are all worked out from that list. That means stats, awards and Realm rules added later also count everything you've already played, and undo simply records "ignore that one". Two iPads can play the same trip; each sends what it recorded and picks up what the other did.
 
 | Option | Docker / Unraid variable | What it does |
 | --- | --- | --- |
