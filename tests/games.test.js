@@ -1,7 +1,7 @@
 // Run with: node --test 'tests/*.test.js'
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildState, lastUndoable, US_STATES, volvoName, levelFor, AWARDS } = require('../web/games.js');
+const { buildState, lastUndoable, US_STATES, volvoName, levelFor, AWARDS, endorsements } = require('../web/games.js');
 
 // An ordinary day (noon, no holiday, no full moon) so hidden awards stay hidden.
 const BASE = new Date(2026, 0, 20, 12).getTime();
@@ -140,4 +140,20 @@ test('Mexico, Puerto Rico, diplomat and government plates', () => {
   const st = buildState(evs);
   for (const id of ['hola', 'isla', 'diplomat', 'gov_issue', 'border_to_border']) assert.ok(st.life.kid.awards[id], id);
   assert.ok(!US_STATES.includes('PR'), 'Puerto Rico does not count toward the 50');
+});
+
+test('certificate endorsements say how the trip was won', () => {
+  const evs = trip();
+  evs.push(E('flock.add', { trip: 't1', player: 'kid', animal: 'cow', n: 40 }));
+  evs.push(E('flock.add', { trip: 't1', player: 'kid', animal: 'cow', n: 12 }));
+  evs.push(E('flock.add', { trip: 't1', player: 'mom', animal: 'horse', n: 10 }));
+  evs.push(E('flock.cemetery', { trip: 't1', player: 'kid', victims: ['mom'] }));
+  evs.push(E('flock.add', { trip: 't1', player: 'mom', animal: 'sheep', n: 50 }));
+  evs.push(E('trip.end', { id: 't1' }));
+  const st = buildState(evs);
+  const t = st.trips.t1;
+  assert.deepEqual(endorsements(t, 'kid', 'flocks'), ['With only cows', 'Never lost a flock', 'Photo finish']);
+  assert.deepEqual(endorsements(t, 'mom', 'flocks'), ['Survived a cemetery']);
+  assert.ok(t.awards.some(a => a.player === 'kid' && a.award === 'champion'));
+  assert.equal(t.badgesAtEnd.kid, st.life.kid.badges);
 });

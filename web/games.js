@@ -211,6 +211,7 @@ function buildState(events, seenIds) {
       if (got) { got.count++; got.last = { ts: e.ts, trip: tripId }; got.trips.push(tripId); }
       else l.awards[a.id] = { ts: e.ts, trip: tripId, count: 1, last: { ts: e.ts, trip: tripId }, trips: tripId ? [tripId] : [] };
       l.badges++;
+      if (tripId) ctx.trip.awards.push({ player: pid, award: a.id, ts: e.ts, count: l.awards[a.id].count });
       if (seenIds && !seenIds.has(e.id)) st.newAwards.push({ player: pid, award: a.id, count: l.awards[a.id].count });
     }
     const after = levelFor(l.badges);
@@ -253,7 +254,7 @@ function buildState(events, seenIds) {
       case 'trip.start': {
         if (!d.id || st.trips[d.id]) break;
         const players = [...new Set(d.players || [])].filter(pid => st.players[pid]).slice(0, MAX_PLAYERS);
-        const trip = { id: d.id, name: String(d.name || 'Road trip'), players, start: e.ts, end: null, by: {}, plates: {}, pins: [], winners: {} };
+        const trip = { id: d.id, name: String(d.name || 'Road trip'), players, start: e.ts, end: null, by: {}, plates: {}, pins: [], winners: {}, awards: [], badgesAtEnd: {} };
         st.trips[d.id] = trip;
         st.tripOrder.push(d.id);
         for (const pid of players) {
@@ -279,6 +280,7 @@ function buildState(events, seenIds) {
         for (const pid of trip.players) {
           life(pid).bestFlock = Math.max(life(pid).bestFlock, trip.by[pid].score);
           award(pid, { trip, tp: trip.by[pid], won: won[pid] || [] }, e);
+          trip.badgesAtEnd[pid] = life(pid).badges;
         }
         break;
       }
@@ -399,6 +401,49 @@ function buildState(events, seenIds) {
   return st;
 }
 
+// Endorsements: the little extras printed on a certificate, saying how a
+// player played a game on one trip ("With only cows", "By a landslide").
+function endorsements(trip, pid, game) {
+  const tp = trip && trip.by[pid];
+  if (!tp) return [];
+  const out = [];
+  const won = id => (trip.winners[id] || []).includes(pid);
+  const only = (by, list) => { const ks = Object.keys(by).filter(k => by[k] > 0); return ks.length === 1 ? list.find(x => x.id === ks[0]) : null; };
+  const margin = (c) => {
+    const mine = c.score(tp), rest = trip.players.filter(p => p !== pid).map(p => c.score(trip.by[p]));
+    const next = rest.length ? Math.max(...rest) : 0;
+    if (mine > 0 && (next === 0 ? rest.length > 0 : mine >= 2 * next)) out.push('By a landslide');
+    else if (mine > next && mine - next <= Math.max(2, Math.round(mine * 0.05))) out.push('Photo finish');
+  };
+  const contest = id => CONTESTS.find(c => c.id === id);
+  if (game === 'flocks') {
+    const a = only(tp.byAnimal, ANIMALS);
+    if (a) out.push(`With only ${a.name.toLowerCase()}`);
+    if (ANIMALS.every(x => tp.byAnimal[x.id])) out.push('Every animal on the farm');
+    if (tp.deaths === 0 && tp.counted > 0) out.push('Never lost a flock');
+    if (tp.deaths > 0) out.push(tp.deaths === 1 ? 'Survived a cemetery' : `Survived ${tp.deaths} cemeteries`);
+    if (tp.churches > 0 && tp.deaths > 0) out.push('Saved by a church');
+    if (tp.kills >= 3) out.push(`Buried ${tp.kills} flocks`);
+    if (won('flocks')) margin(contest('flocks'));
+  } else if (game === 'zombies') {
+    const z = only(tp.zombieBy, ZOMBIES);
+    if (z && tp.zombies > 1) out.push(`Nothing but ${z.name.toLowerCase()}`);
+    if (ZOMBIES.every(x => tp.zombieBy[x.id])) out.push('All six kinds');
+    if (won('zombies')) margin(contest('zombies'));
+  } else if (game === 'volvos') {
+    const c = only(tp.volvoBy, VOLVO_COLORS);
+    if (c && tp.volvos > 1 && c.id !== 'other') out.push(`Only ${c.name.toLowerCase()} trucks`);
+    if (Object.keys(tp.volvoBy).length >= 6) out.push('A rainbow of trucks');
+    if (tp.volvoBranded >= 3 && tp.volvoBranded * 2 >= tp.volvos) out.push('Say-it-twice specialist');
+    if (won('volvos')) margin(contest('volvos'));
+  } else if (game === 'plates') {
+    const n = US_STATES.filter(st => trip.plates[st]).length;
+    if (n) out.push(`${n} state${n === 1 ? '' : 's'} this trip`);
+    if (Object.keys(trip.plates).some(k => k.startsWith('CA-'))) out.push('Plates from Canada');
+  }
+  return out;
+}
+
 // The last thing a player did on a trip in one game that can still be undone.
 const UNDO_KINDS = {
   flocks: ['flock.add', 'flock.cemetery', 'flock.church', 'flock.wipe'],
@@ -416,4 +461,4 @@ function lastUndoable(events, st, tripId, playerId, game) {
   return best;
 }
 
-if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };
+if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };

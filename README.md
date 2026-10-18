@@ -17,6 +17,7 @@ It's one small program that runs at home on a Windows PC, a Mac, a Raspberry Pi 
 - [The games](#the-games)
 - [Trip map](#trip-map)
 - [Stats and awards](#stats-and-awards)
+- [Printable certificates](#printable-certificates)
 - [Night mode](#night-mode)
 - [Installing](#installing): [Windows](#windows), [Docker Compose](#docker-compose), [Unraid](#unraid)
 - [Setting up the iPad](#setting-up-the-ipad)
@@ -76,6 +77,14 @@ When the iPad uses the home server's secure address (see [Setting up the iPad](#
 - **Levels:** every award you earn, repeats included, counts toward your level, like the badges on a fitness watch. Level 2 takes 1 award, level 3 takes 3, level 4 takes 6, and so on. Each level needs one more award than the last.
 
 ![Awards](docs/screenshots/awards.png)
+
+### Printable certificates
+
+Every earned award, every level and every finished trip has a certificate to print or save as a PDF, the kind of thing kids love to get handed at the end of a trip. Tap an earned award under **Awards**, **🎓 Level certificate** next to a player's level, or **🎓 Certificates** next to a trip under **Stats** (the same list opens by itself when you end a trip). Then tap **Print or save as PDF**. On the iPad, choose a printer, or pinch outward on the preview and use Share to save the PDF.
+
+Certificates add little ribbons for how the game was won, like *With only cows*, *Never lost a flock*, *Survived 2 cemeteries* or *By a landslide*. A trip certificate shows the player's scores and medals and every award they earned on that trip. Each one carries the player's level seal and is signed by **Skippy the Magnificent, Chief Road Trip Officer**, with a blank line for the grown-up in charge. Change the name and title under **⚙️ Trips & players**.
+
+![A Flock Champion certificate](docs/screenshots/certificate.png)
 
 ## Night mode
 

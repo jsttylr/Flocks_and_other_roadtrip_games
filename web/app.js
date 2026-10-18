@@ -409,10 +409,11 @@ function viewStats() {
     <p class="muted">Never seen yet: ${US_STATES.filter(s => !everPlates.has(s)).map(s => PLATES[s].name).join(', ') || 'nothing. You\'ve seen them all!'}</p></div>`;
 
   const win = (t, id) => t.end ? (t.winners[id].map(playerName).join(' & ') || '–') : '…';
-  const history = `<div class="card scroll"><h2>Trips</h2><table class="stats trips"><thead><tr><th>Trip</th><th>When</th><th>🐄 Flocks</th><th>🧟 Zombies</th><th>🚚 Volvos</th><th>🚗 Plates</th></tr></thead><tbody>` +
+  const history = `<div class="card scroll"><h2>Trips</h2><table class="stats trips"><thead><tr><th>Trip</th><th>When</th><th>🐄 Flocks</th><th>🧟 Zombies</th><th>🚚 Volvos</th><th>🚗 Plates</th><th></th></tr></thead><tbody>` +
     allTrips().map(t => `<tr><td>${esc(t.name)}${t.end ? '' : ' <span class="live">playing</span>'}</td><td>${fmtDate(t.start)}</td>
       <td>${win(t, 'flocks')}</td><td>${win(t, 'zombies')}</td><td>${win(t, 'volvos')}</td>
-      <td>${US_STATES.filter(s => t.plates[s]).length} states</td></tr>`).join('') +
+      <td>${US_STATES.filter(s => t.plates[s]).length} states</td>
+      <td>${t.end ? `<button class="ghost small" data-act="trip-certs" data-trip="${t.id}">🎓 Certificates</button>` : ''}</td></tr>`).join('') +
     `</tbody></table></div>`;
   return flocks + zombies + volvos + plates + history;
 }
@@ -430,18 +431,121 @@ function viewAwards() {
     return `<div class="card"><h2>${dot(pid)}${playerName(pid)} <span class="muted">${earned} of ${AWARDS.length} awards</span></h2>
       <div class="level"><span class="lvl">${lv.level}</span><div><b>Level ${lv.level} · ${lv.title}</b>
         <div class="muted">${plural(l.badges, 'award', 'awards')} earned, repeats included. ${plural(lv.to - l.badges, 'more', 'more')} for level ${lv.level + 1}.</div>
-        <div class="bar"><div style="width:${Math.round(100 * (l.badges - lv.from) / (lv.to - lv.from))}%"></div></div></div></div>
+        <div class="bar"><div style="width:${Math.round(100 * (l.badges - lv.from) / (lv.to - lv.from))}%"></div></div></div>
+        <button class="ghost" data-act="cert-level" data-player="${pid}">🎓 Level certificate</button></div>
+      <p class="muted tip">Tap an earned award to print its certificate.</p>
       <div class="awards">` +
       shown.map(a => {
         const got = l.awards[a.id];
         const times = got && got.count > 1 ? `<span class="times">×${got.count}</span>` : '';
-        return `<div class="award${got ? ' got' : ''}"><div class="aicon">${a.icon}</div><div><b>${a.name}</b>${times}<div class="muted">${a.desc}${a.repeat ? ' <span class="again">↻ every trip</span>' : ''}</div>
+        return `<div class="award${got ? ' got' : ''}"${got ? ` data-act="cert-award" data-player="${pid}" data-award="${a.id}" title="Print a certificate"` : ''}><div class="aicon">${a.icon}</div><div><b>${a.name}</b>${times}<div class="muted">${a.desc}${a.repeat ? ' <span class="again">↻ every trip</span>' : ''}</div>
           ${got ? `<div class="when">${got.count > 1 ? 'First ' + when(got) + '; last ' + when(got.last) : when(got)}</div>` : ''}</div></div>`;
       }).join('') +
       (secret ? `<div class="award secret"><div class="aicon">❔</div><div><b>${plural(secret, 'hidden award', 'hidden awards')}</b><div class="muted">Keep playing to find out. Zombies know a few.</div></div></div>` : '') +
       `</div></div>`;
   }).join('');
 }
+
+// ---------- Certificates ----------
+// A printable page for an award, a level or a trip. It's ordinary HTML laid
+// out as a landscape letter page; Print (or Share, Print, then pinch out) on
+// the iPad saves it as a PDF.
+
+function signer() { return { name: db.signer || 'Skippy the Magnificent', title: db.signerTitle || 'Chief Road Trip Officer' }; }
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+const longDate = ts => new Date(ts).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+
+function certPage({ kind, name, intro, icon, title, desc, ribbons = [], body = '', when, level }) {
+  const sg = signer();
+  return `<div class="cert"><div class="cert-in">
+    <div class="c-corner tl">✦</div><div class="c-corner tr">✦</div><div class="c-corner bl">✦</div><div class="c-corner br">✦</div>
+    <div class="c-brand">🚙 Roadtrip Games</div>
+    <div class="c-kind">${kind}</div>
+    <div class="c-small">This certifies that</div>
+    <div class="c-name">${esc(name)}</div>
+    <div class="c-small">${intro}</div>
+    <div class="c-title">${icon ? `<span class="c-icon">${icon}</span>` : ''}${title}</div>
+    ${desc ? `<div class="c-desc">${desc}</div>` : ''}
+    ${ribbons.length ? `<div class="c-ribbons">${ribbons.map(r => `<span>★ ${esc(r)} ★</span>`).join('')}</div>` : ''}
+    ${body}
+    ${when ? `<div class="c-when">${when}</div>` : ''}
+    <div class="c-foot">
+      <div class="c-sig"><div class="c-sig-name">${esc(sg.name)}</div><div class="c-sig-line"></div><div class="c-sig-title">${esc(sg.title)}</div></div>
+      <div class="c-seal"><div class="c-seal-in"><small>LEVEL</small><b>${level.level}</b><small>${esc(level.title)}</small></div></div>
+      <div class="c-sig"><div class="c-sig-name">&nbsp;</div><div class="c-sig-line"></div><div class="c-sig-title">Grown-up in charge</div></div>
+    </div></div></div>`;
+}
+
+function awardCert(pid, awardId, tripId) {
+  const a = AWARDS.find(x => x.id === awardId), l = state.life[pid], got = l.awards[awardId];
+  if (!a || !got) return '';
+  const tid = tripId || (got.last && got.last.trip) || got.trip;
+  const trip = tid && state.trips[tid];
+  const n = a.repeat && trip ? got.trips.indexOf(tid) + 1 : 0;
+  const at = trip ? (trip.awards.find(x => x.player === pid && x.award === awardId) || {}).ts : got.ts;
+  const lvl = levelFor(trip && trip.end && trip.badgesAtEnd[pid] !== undefined ? trip.badgesAtEnd[pid] : l.badges);
+  return certPage({
+    kind: a.hidden ? 'Certificate of Secret Achievement' : 'Certificate of Achievement',
+    name: state.players[pid].name, intro: 'has earned the award', icon: a.icon,
+    title: esc(a.name) + (n > 1 ? ` <span class="c-times">for the ${ordinal(n)} time</span>` : ''),
+    desc: esc(a.desc), ribbons: trip ? endorsements(trip, pid, a.game) : [],
+    when: `${trip ? `On the trip “${esc(trip.name)}”, ` : ''}${longDate(at || got.ts)}`, level: lvl,
+  });
+}
+
+function levelCert(pid) {
+  const l = state.life[pid], lv = levelFor(l.badges);
+  const wins = l.wins.flocks + l.wins.zombies + l.wins.volvos;
+  const ribbons = [plural(l.trips, 'trip', 'trips'), plural(wins, 'win', 'wins'), plural(Object.keys(l.awards).length, 'different award', 'different awards')];
+  return certPage({
+    kind: 'Certificate of Rank', name: state.players[pid].name, intro: 'has reached the rank of', icon: '⭐',
+    title: `Level ${lv.level} · ${esc(lv.title)}`, desc: `By earning ${plural(l.badges, 'award', 'awards')} on the road, repeats included`,
+    ribbons, when: longDate(Date.now()), level: lv,
+  });
+}
+
+function tripCert(pid, tripId) {
+  const trip = state.trips[tripId], tp = trip.by[pid];
+  const medal = c => {
+    const scores = [...new Set(trip.players.map(p => c.score(trip.by[p])))].sort((a, b) => b - a);
+    const i = scores.indexOf(c.score(tp));
+    return c.score(tp) > 0 ? ['🥇', '🥈', '🥉'][i] || '' : '';
+  };
+  const rows = CONTESTS.map(c => `<tr><td>${c.icon} ${c.name}</td><td>${num(c.score(tp))}${c.id === 'volvos' ? ' points' : ''}</td><td>${medal(c)}</td></tr>`).join('') +
+    `<tr><td>🚗 Plates (the whole car)</td><td>${US_STATES.filter(s => trip.plates[s]).length} states</td><td></td></tr>`;
+  const mine = trip.awards.filter(x => x.player === pid);
+  const icons = [...new Set(mine.map(x => x.award))].map(id => AWARDS.find(a => a.id === id)).filter(Boolean);
+  const body = `<table class="c-table">${rows}</table>${icons.length ? `<div class="c-earned">Awards on this trip: ${icons.map(a => `<span>${a.icon} ${esc(a.name)}</span>`).join('')}</div>` : ''}`;
+  const ribbons = CONTESTS.flatMap(c => endorsements(trip, pid, c.id).map(r => `${c.icon} ${r}`)).slice(0, 5);
+  return certPage({
+    kind: 'Road Trip Certificate', name: state.players[pid].name, intro: 'rode along and played on', icon: '🛣️',
+    title: `“${esc(trip.name)}”`, ribbons, body,
+    when: `${longDate(trip.start)}${trip.end && new Date(trip.end).toDateString() !== new Date(trip.start).toDateString() ? ' to ' + longDate(trip.end) : ''}`,
+    level: levelFor(trip.badgesAtEnd[pid] !== undefined ? trip.badgesAtEnd[pid] : state.life[pid].badges),
+  });
+}
+
+function tripCertsSheet(tripId) {
+  const trip = state.trips[tripId];
+  if (!trip) return;
+  sheet(`<h2>🎓 Certificates for ${esc(trip.name)}</h2><p class="muted">Pick one to print or save as a PDF.</p>` + trip.players.map(pid => {
+    const ids = [...new Set(trip.awards.filter(x => x.player === pid).map(x => x.award))];
+    return `<h3>${dot(pid)}${playerName(pid)}</h3><div class="row wrap">
+      <button data-act="cert-trip" data-player="${pid}" data-trip="${tripId}">🛣️ Trip certificate</button>
+      ${ids.map(id => { const a = AWARDS.find(x => x.id === id); return a ? `<button class="ghost" data-act="cert-award" data-player="${pid}" data-award="${id}" data-trip="${tripId}">${a.icon} ${esc(a.name)}</button>` : ''; }).join('')}
+    </div>`;
+  }).join(''));
+}
+
+function showCert(html) {
+  if (!html) return;
+  const c = $('#cert');
+  c.innerHTML = `<div class="cert-bar"><button class="primary" data-act="cert-print">🖨️ Print or save as PDF</button><button class="ghost" data-act="cert-close">Close</button></div>${html}`;
+  c.classList.add('open');
+  document.body.classList.add('cert-open');
+  c.scrollTop = 0;
+}
+function hideCert() { $('#cert').classList.remove('open'); document.body.classList.remove('cert-open'); }
 
 // ---------- Setup ----------
 
@@ -460,7 +564,10 @@ function viewSetup() {
   const saving = `<div class="card"><h2>Saving</h2><p>${syncDetail()}</p>
     <p class="muted">Everything is kept on this iPad as you play, so a dead zone never loses anything. Whenever the iPad can reach home (home Wi-Fi, or WireGuard over cell) it sends what it has and picks up what any other device recorded.</p>
     <div class="row"><button data-act="sync">Save at home now</button><a class="button ghost" href="api/backup">Download a backup</a></div></div>`;
-  return trip + players + locationCard() + saving;
+  const certs = `<div class="card"><h2>🎓 Certificates</h2>
+    <p class="muted">Every earned award, every level and every finished trip has a certificate to print or save as a PDF: tap an award under Awards, or 🎓 next to a trip under Stats. They're signed by:</p>
+    <div class="row"><label class="grow">Name <input id="cert-signer" value="${esc(signer().name)}"></label><label class="grow">Title <input id="cert-signer-title" value="${esc(signer().title)}"></label></div></div>`;
+  return trip + players + certs + locationCard() + saving;
 }
 
 function locationCard() {
@@ -657,6 +764,7 @@ function onClick(ev) {
       const done = state.trips[t.id];
       const lines = CONTESTS.map(c => done.winners[c.id].length ? `${c.icon} ${done.winners[c.id].map(playerName).join(' & ')}` : '').filter(Boolean);
       toast(lines.length ? `🏆 ${lines.join(' · ')}` : 'Trip ended', true);
+      tripCertsSheet(t.id);
       break;
     }
     case 'add-player': playerSheet(null); break;
@@ -677,6 +785,12 @@ function onClick(ev) {
       applyTheme();
       render();
       break;
+    case 'trip-certs': tripCertsSheet(d.trip); break;
+    case 'cert-trip': closeSheet(); showCert(tripCert(d.player, d.trip)); break;
+    case 'cert-award': closeSheet(); showCert(awardCert(d.player, d.award, d.trip)); break;
+    case 'cert-level': showCert(levelCert(d.player)); break;
+    case 'cert-print': window.print(); break;
+    case 'cert-close': hideCert(); break;
     case 'close': closeSheet(); break;
   }
 }
@@ -688,6 +802,8 @@ applyTheme();
 document.addEventListener('click', onClick);
 document.addEventListener('change', ev => {
   if (ev.target.id === 'map-trip') { db.mapTrip = ev.target.value; mapView = null; save(); render(); }
+  if (ev.target.id === 'cert-signer') { db.signer = ev.target.value.trim(); save(); }
+  if (ev.target.id === 'cert-signer-title') { db.signerTitle = ev.target.value.trim(); save(); }
 });
 $('#sheet').addEventListener('click', ev => { if (ev.target.id === 'sheet') closeSheet(); });
 refresh(known);
