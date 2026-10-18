@@ -257,3 +257,4 @@ button.holy { background: #f3e3a3; border-color: #e0c860; color: #5a4600; }
 .addr { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
 .addr a { font-size: 1.1em; font-weight: 700; color: var(--green); word-break: break-all; }
 code { font-size: 0.8em; word-break: break-all; }
+.steps a, .card p a { color: var(--green); }

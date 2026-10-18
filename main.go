@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata" // so TZ works in the tiny Docker image, which has no time zone files
 )
 
 var appVersion = "0.2.0"

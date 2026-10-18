@@ -11,7 +11,7 @@ services:
     volumes:
       - roadtrip-data:/data   # the game history survives updates
     environment:
-      - TZ=America/New_York
+      - TZ=America/Chicago   # your time zone
       # The address the iPad uses to reach this machine (change to yours), so the
       # secure address works. List several separated by commas.
       - ROADTRIP_HOSTS=192.168.1.50

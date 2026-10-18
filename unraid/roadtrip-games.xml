@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!-- Unraid template for Roadtrip Games. Copy this file to the flash drive at
+     config/plugins/dockerMan/templates-user/my-roadtrip-games.xml, then pick
+     "roadtrip-games" under Docker, Add Container, Template. See the README. -->
+<Container version="2">
+  <Name>roadtrip-games</Name>
+  <Repository>ghcr.io/jsttylr/flocks_and_other_roadtrip_games:main</Repository>
+  <Registry>https://github.com/jsttylr/Flocks_and_other_roadtrip_games/pkgs/container/flocks_and_other_roadtrip_games</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/jsttylr/Flocks_and_other_roadtrip_games</Support>
+  <Project>https://github.com/jsttylr/Flocks_and_other_roadtrip_games</Project>
+  <Overview>Score Flocks, Zombie Flocks, Volvo trucks and the license plate game on an iPad in the car, with lifetime stats, awards and a map of every trip. The iPad saves everything itself and syncs to this server whenever it can reach home. Open the plain address once on the iPad and follow "Turn on locations for the map" under Trips and players to use the secure address.</Overview>
+  <Category>Tools: Other:</Category>
+  <WebUI>http://[IP]:[PORT:8070]/</WebUI>
+  <ExtraParams/>
+  <PostArgs/>
+  <Config Name="Web page" Target="8070" Default="8070" Mode="tcp" Description="The plain address. Open this first on the iPad." Type="Port" Display="always" Required="true" Mask="false">8070</Config>
+  <Config Name="Secure web page (GPS)" Target="8443" Default="8443" Mode="tcp" Description="The secure (https) address. The iPad only shares its location with this one." Type="Port" Display="always" Required="true" Mask="false">8443</Config>
+  <Config Name="Game history" Target="/data" Default="/mnt/user/appdata/roadtrip-games" Mode="rw" Description="Where every trip is kept, plus the certificate the iPad trusts. Back this folder up." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/roadtrip-games</Config>
+  <Config Name="Server address for the iPad" Target="ROADTRIP_HOSTS" Default="" Mode="" Description="The address the iPad uses to reach this Unraid server, for example 192.168.1.10. Add more separated by commas (tower.local, or a WireGuard address)." Type="Variable" Display="always" Required="true" Mask="false">192.168.1.10,tower.local</Config>
+  <Config Name="Time zone" Target="TZ" Default="America/Chicago" Mode="" Description="Used for the times in the log." Type="Variable" Display="advanced" Required="false" Mask="false">America/Chicago</Config>
+</Container>

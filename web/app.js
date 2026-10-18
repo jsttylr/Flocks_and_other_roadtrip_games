@@ -324,7 +324,7 @@ function viewMap() {
 }
 
 function dropMap() {
-  if (map) { mapView = { c: map.getCenter(), z: map.getZoom(), trip: db.mapTrip }; map.remove(); map = null; }
+  if (map) { mapView = { c: map.getCenter(), z: map.getZoom(), trip: map.tripId }; map.remove(); map = null; }
 }
 
 function drawMap() {
@@ -332,6 +332,7 @@ function drawMap() {
   if (!el || typeof L === 'undefined') return;
   const t = state.trips[db.mapTrip];
   map = L.map(el);
+  map.tripId = db.mapTrip;
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
   const pts = [];
   for (const p of t.pins) {
@@ -346,6 +347,13 @@ function drawMap() {
   else if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
   else if (fix) map.setView([fix.lat, fix.lon], 11);
   else map.setView([39.5, -98.35], 4);
+  // The page may still be settling its layout; measure again once it has.
+  const m = map;
+  requestAnimationFrame(() => {
+    if (m !== map) return;
+    m.invalidateSize();
+    if (!(mapView && mapView.trip === db.mapTrip) && pts.length) m.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
+  });
 }
 
 // ---------- Stats and awards ----------
