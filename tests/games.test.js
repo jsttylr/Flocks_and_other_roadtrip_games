@@ -1,7 +1,7 @@
 // Run with: node --test 'tests/*.test.js'
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildState, lastUndoable, US_STATES, volvoName, levelFor, AWARDS, endorsements, hexAt, hexNeighbors, longestRoad, roadKey, realmCurrent, realmRank, exploreRank } = require('../web/games.js');
+const { buildState, lastUndoable, hexCorners, CROPS, driveRank, kmBetween, US_STATES, volvoName, levelFor, AWARDS, endorsements, hexAt, hexNeighbors, longestRoad, roadKey, realmCurrent, realmRank, exploreRank } = require('../web/games.js');
 
 // An ordinary day (noon, no holiday, no full moon) so hidden awards stay hidden.
 const BASE = new Date(2026, 0, 20, 12).getTime();
@@ -45,7 +45,7 @@ test('cemetery kills the named flocks, church brings yours back', () => {
 
 test('zombies and Volvo trucks are their own contests', () => {
   const evs = trip();
-  for (const z of ['deer', 'rabbit', 'squirrel', 'fox', 'raccoon', 'opossum']) evs.push(E('zombie.add', { trip: 't1', player: 'kid', animal: z }));
+  for (const z of ['deer', 'rabbit', 'squirrel', 'fox', 'raccoon', 'opossum', 'groundhog', 'iguana']) evs.push(E('zombie.add', { trip: 't1', player: 'kid', animal: z }));
   evs.push(E('volvo.add', { trip: 't1', player: 'mom', color: 'white', branded: true }));
   evs.push(E('volvo.add', { trip: 't1', player: 'mom', color: 'blue' }));
   evs.push(E('volvo.add', { trip: 't1', player: 'kid', color: 'red' }));
@@ -53,7 +53,7 @@ test('zombies and Volvo trucks are their own contests', () => {
   evs.push(E('flock.cemetery', { trip: 't1', player: 'mom', victims: ['kid'] }));
   evs.push(E('trip.end', { id: 't1' }));
   const st = buildState(evs);
-  assert.equal(st.trips.t1.by.kid.zombies, 6, 'cemeteries leave zombies alone');
+  assert.equal(st.trips.t1.by.kid.zombies, 8, 'cemeteries leave zombies alone');
   assert.deepEqual(st.trips.t1.winners.zombies, ['kid']);
   assert.deepEqual(st.trips.t1.winners.volvos, ['mom']);
   assert.deepEqual(st.trips.t1.winners.flocks, []);
@@ -178,12 +178,12 @@ test('the Realm: territory, payday, building, trading and longest road', () => {
   assert.equal(Object.values(kidBefore).reduce((a, b) => a + b, 0), 8, '7 paid + 1 stolen');
 
   assert.deepEqual(st.realm.turn.order, ['mom', 'kid'], 'a tie on the trip keeps the usual order');
-  evs.push(E('realm.build', { player: 'kid', kind: 'settlement', hex: home }));     // not kid's turn yet: refused
-  evs.push(E('realm.build', { player: 'mom', kind: 'settlement', hex: home }));     // not mom's land: refused
+  evs.push(E('realm.build', { grid: 2, player: 'kid', kind: 'settlement', hex: home }));     // not kid's turn yet: refused
+  evs.push(E('realm.build', { grid: 2, player: 'mom', kind: 'settlement', hex: home }));     // not mom's land: refused
   evs.push(E('realm.pass', { player: 'mom' }));
-  evs.push(E('realm.build', { player: 'kid', kind: 'settlement', hex: home }));
+  evs.push(E('realm.build', { grid: 2, player: 'kid', kind: 'settlement', hex: home }));
   const next = hexNeighbors(home)[0];
-  evs.push(E('realm.build', { player: 'kid', kind: 'road', hex: home, to: next }));   // next isn't on the board yet: refused
+  evs.push(E('realm.build', { grid: 2, player: 'kid', kind: 'road', hex: home, to: next }));   // next isn't on the board yet: refused
   st = buildState(evs);
   assert.deepEqual(st.realm.hexes[home].building && st.realm.hexes[home].building.player, 'kid');
   assert.equal(st.realm.points.kid, 1);
@@ -219,15 +219,128 @@ test('exploring: new tiles count for the whole car, first sightings make pioneer
   evs.push(E('trip.hex', { trip: 't1', loc: at(41.26, -95.94) }));               // same tile: nothing new
   evs.push(E('flock.add', { trip: 't1', player: 'kid', animal: 'cow', n: 3, loc: at(41.26, -95.94) })); // first sighting there
   evs.push(E('zombie.add', { trip: 't1', player: 'mom', animal: 'deer', loc: at(41.26, -95.94) }));     // not first
-  for (let i = 1; i <= 25; i++) evs.push(E('trip.hex', { trip: 't1', loc: at(41.26, -95.94 + i * 0.5) }));
+  for (let i = 1; i <= 45; i++) evs.push(E('trip.hex', { trip: 't1', loc: at(41.26, -95.94 + i * 0.5) }));
   evs.push(E('trip.end', { id: 't1' }));
   const st = buildState(evs);
-  assert.equal(st.life.mom.explore.tiles, 26);
-  assert.equal(st.life.kid.explore.tiles, 26);
+  assert.equal(st.life.mom.explore.tiles, 46);
+  assert.equal(st.life.kid.explore.tiles, 46);
   assert.equal(st.life.kid.explore.pioneered, 1);
   assert.equal(st.life.mom.explore.pioneered, 0);
-  assert.ok(st.life.kid.explore.farthest > 950 && st.life.kid.explore.farthest < 1150, String(st.life.kid.explore.farthest));
+  assert.ok(st.life.kid.explore.farthest > 1800 && st.life.kid.explore.farthest < 2000, String(st.life.kid.explore.farthest));
   for (const id of ['first_steps', 'off_the_map', 'far_from_home']) assert.ok(st.life.mom.awards[id], id);
   assert.ok(st.life.kid.awards.pioneer && !st.life.mom.awards.pioneer);
-  assert.equal(exploreRank(26).title, 'Scout');
+  assert.equal(exploreRank(46).title, 'Scout');
+});
+
+test('the driver: km by GPS, a shield from cemeteries, swaps, a wage and awards', () => {
+  const evs = trip(['mom', 'kid', 'dad']);
+  evs[evs.length - 1].data.driver = 'dad';
+  const step = 0.009;                       // about 1 km of latitude
+  const at = i => ({ lat: 41 + i * step, lon: -96 });
+  for (let i = 0; i <= 60; i++) evs.push(E('trip.track', { trip: 't1', loc: at(i) }));
+  evs.push(E('flock.add', { trip: 't1', player: 'dad', animal: 'cow', n: 40 }));
+  evs.push(E('flock.add', { trip: 't1', player: 'kid', animal: 'deer', n: 6 }));
+  evs.push(E('flock.cemetery', { trip: 't1', player: 'kid', victims: ['dad', 'mom'] }));   // dad is driving: safe
+  evs.push(E('trip.driver', { trip: 't1', player: 'mom' }));
+  for (let i = 61; i <= 80; i++) evs.push(E('trip.track', { trip: 't1', loc: at(i) }));
+  evs.push(E('trip.driver', { trip: 't1', player: null }));
+  evs.push(E('trip.driver', { trip: 't1', player: 'dad' }));
+  for (let i = 0; i < 12; i++) evs.push(E('zombie.add', { trip: 't1', player: 'kid', animal: 'rabbit' }));
+  evs.push(E('trip.end', { id: 't1' }));
+  const st = buildState(evs), t = st.trips.t1;
+  assert.equal(t.by.dad.score, 40, "the driver's flock survived");
+  assert.equal(t.by.kid.byAnimal.deer, 6, 'live deer count as a flock');
+  assert.ok(st.life.kid.awards.bambi);
+  assert.ok(Math.abs(t.by.dad.driven - 60) < 1, String(t.by.dad.driven));
+  assert.ok(Math.abs(t.by.mom.driven - 20) < 1, String(t.by.mom.driven));
+  assert.ok(Math.abs(t.km - 80) < 1);
+  assert.equal(t.track.length, 81);
+  assert.equal(t.swaps, 3);
+  assert.ok(st.life.dad.awards.wheelman && st.life.dad.awards.first_leg && !st.life.mom.awards.wheelman);
+  assert.ok(st.life.kid.awards.relay, 'relay goes to everyone in the car');
+  // Dad drove 60 km: 1 resource of wage. Kid spotted plenty, so dad is topped
+  // up to his share of the passengers' average too.
+  assert.equal(t.wage.dad.wage, 1);
+  assert.equal(t.wage.mom.wage, 0);
+  assert.ok(t.wage.dad.topup >= 0);
+  assert.equal(driveRank(60).title, 'Licensed');
+  assert.ok(Math.abs(kmBetween({ lat: 41, lon: -96 }, { lat: 42, lon: -96 }) - 111.2) < 0.5);
+});
+
+test("who's in the car: hop in and out mid-trip", () => {
+  const evs = trip(['mom', 'kid']);
+  evs.splice(2, 0, E('player.add', { id: 'cousin', name: 'Cousin' }));
+  evs.push(E('trip.crew', { trip: 't1', player: 'cousin', aboard: true }));
+  evs.push(E('flock.add', { trip: 't1', player: 'cousin', animal: 'cow', n: 5 }));
+  evs.push(E('plate.spot', { trip: 't1', plate: 'OH' }));
+  evs.push(E('trip.crew', { trip: 't1', player: 'cousin', aboard: false }));
+  evs.push(E('flock.add', { trip: 't1', player: 'cousin', animal: 'cow', n: 50 }));     // not in the car: ignored
+  evs.push(E('plate.spot', { trip: 't1', plate: 'TX' }));
+  evs.push(E('trip.end', { id: 't1' }));
+  const st = buildState(evs), t = st.trips.t1;
+  assert.deepEqual(t.players, ['mom', 'kid', 'cousin']);
+  assert.deepEqual(t.aboard, ['mom', 'kid']);
+  assert.equal(t.by.cousin.score, 5);
+  assert.ok(st.life.cousin.uniquePlates.has('OH') && !st.life.cousin.uniquePlates.has('TX'));
+  assert.equal(st.life.cousin.trips, 1);
+  assert.ok(t.paid.cousin, 'cousin still gets paid for their part');
+});
+
+test('fields, farms and monasteries: grain for settlements, gold for visited tiles', () => {
+  const evs = trip();
+  const here = { lat: 41.26, lon: -95.94 }, home = hexAt(here.lat, here.lon);
+  const near = hexNeighbors(home)[0], c = hexCorners(near).center, there = { lat: c[0], lon: c[1] };
+  for (const crop of ['corn', 'corn', 'soy']) evs.push(E('field.add', { trip: 't1', player: 'kid', crop, loc: here }));
+  evs.push(E('field.add', { trip: 't1', player: 'mom', crop: 'orchard', loc: there }));
+  evs.push(E('flock.church', { trip: 't1', player: 'mom', loc: there }));          // founds a monastery
+  evs.push(E('flock.church', { trip: 't1', player: 'kid', loc: there }));          // one per tile
+  evs.push(E('trip.end', { id: 't1' }));
+  let st = buildState(evs);
+  assert.equal(st.trips.t1.by.kid.fields, 3);
+  assert.deepEqual(st.trips.t1.winners.fields, ['kid']);
+  assert.ok(st.life.kid.awards.first_field && st.life.kid.awards.field_champ);
+  assert.equal(st.realm.farms.length, 1, 'touching farm tiles make one farm');
+  assert.deepEqual(st.realm.farms[0].owners, ['kid']);
+  const m = st.realm.hexes[hexAt(there.lat, there.lon)].monastery;
+  assert.equal(m.player, 'mom');
+  assert.ok(st.life.mom.awards.abbot);
+  assert.equal(st.trips.t1.paid.mom.gold, 1, 'one visited tile next to the monastery');
+  // A settlement on the farm: the farm then feeds it.
+  assert.deepEqual(st.realm.turn.order, ['mom', 'kid'], 'mom did worse, so she goes first');
+  evs.push(E('realm.pass', { player: 'mom' }));
+  evs.push(E('realm.build', { player: 'kid', kind: 'settlement', hex: home }));                 // old grid: dropped
+  st = buildState(evs);
+  assert.equal(st.realm.hexes[home].building, null, 'a build from the old grid is dropped');
+  evs.push(E('realm.build', { grid: 2, player: 'kid', kind: 'settlement', hex: home }));
+  st = buildState(evs);
+  assert.equal(st.realm.farms[0].fed, 1);
+  evs.push(E('trip.start', { id: 't2', name: 'Again', players: ['mom', 'kid'] }));
+  evs.push(E('trip.track', { trip: 't2', loc: there }));                        // through the monastery's tile
+  evs.push(E('trip.end', { id: 't2' }));
+  st = buildState(evs);
+  assert.equal(st.trips.t2.paid.kid.grain, 2, '1 for coming along, 1 from the farm');
+  // Gold buys a resource for 2.
+  const who = realmCurrent(st.realm);
+  evs.push(E('realm.trade', { player: who, with: 'bank', give: { gold: 4 }, get: { ore: 1 } }));   // the bank won't take gold
+  st = buildState(evs);
+  assert.equal(st.realm.purse.mom.gold, 2);
+});
+
+test('classic Volvos, wagons and equipment score on the Volvo tab', () => {
+  const evs = trip();
+  for (const kind of ['classic', 'wagon', 'excavator', 'loader', 'hauler']) evs.push(E('volvo.add', { trip: 't1', player: 'kid', kind }));
+  evs.push(E('volvo.add', { trip: 't1', player: 'kid', color: 'white' }));
+  evs.push(E('zombie.add', { trip: 't1', player: 'kid', animal: 'groundhog' }, null, new Date(2026, 1, 2, 12).getTime()));
+  evs.push(E('trip.end', { id: 't1' }, null, new Date(2026, 1, 3, 12).getTime()));
+  const st = buildState(evs), tp = st.trips.t1.by.kid;
+  assert.equal(tp.volvoPoints, 2 + 1 + 2 + 2 + 2 + 1);
+  assert.equal(tp.volvos, 1, 'only trucks count as trucks');
+  for (const id of ['brick', 'heavy_metal', 'smorgasbord', 'shadow']) assert.ok(st.life.kid.awards[id], id);
+  assert.ok(endorsements(st.trips.t1, 'kid', 'volvos').includes('Hard hat zone'));
+});
+
+test('every award has its own icon', () => {
+  const icons = AWARDS.map(a => a.icon);
+  assert.deepEqual(icons.filter((x, i) => icons.indexOf(x) !== i), []);
+  assert.equal(CROPS.length, 10);
 });

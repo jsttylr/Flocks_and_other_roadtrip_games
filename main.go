@@ -19,7 +19,7 @@ import (
 	_ "time/tzdata" // so TZ works in the tiny Docker image, which has no time zone files
 )
 
-var appVersion = "0.3.0"
+var appVersion = "0.4.0"
 
 func main() {
 	dir := flag.String("data", dataDir(), "folder for the game history")

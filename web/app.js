@@ -33,7 +33,7 @@ function newId() {
 }
 
 // Sightings carry where they happened, when the iPad knows.
-const SIGHTINGS = new Set(['flock.add', 'flock.cemetery', 'flock.church', 'zombie.add', 'volvo.add', 'plate.spot']);
+const SIGHTINGS = new Set(['flock.add', 'flock.cemetery', 'flock.church', 'zombie.add', 'volvo.add', 'field.add', 'plate.spot']);
 
 function record(type, data) {
   const before = known;
@@ -76,22 +76,22 @@ function startGeo() {
   geoWatch = navigator.geolocation.watchPosition(p => {
     fix = { lat: +p.coords.latitude.toFixed(6), lon: +p.coords.longitude.toFixed(6), acc: Math.round(p.coords.accuracy), at: Date.now() };
     geoState = 'on';
-    noteHex();
+    noteTrack();
   }, err => {
     geoState = err.code === 1 ? 'denied' : 'searching';
   }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 60000 });
 }
 
-// Driving into a tile this trip hasn't touched yet is saved, so the map and
-// the explorer scores count the road travelled, not just the sightings.
-const sentHexes = new Set();
-function noteHex() {
+// A GPS spot is saved about every half a kilometre, and whenever the car
+// reaches a new tile. That draws the route, measures who drove how far, and
+// lets the explorer scores count the road travelled, not just the sightings.
+function noteTrack() {
   const t = state && state.activeTrip;
-  if (!t || !fix || fix.acc > 300) return;
-  const key = hexAt(fix.lat, fix.lon);
-  if (t.hexHits.includes(key) || sentHexes.has(t.id + key)) return;
-  sentHexes.add(t.id + key);
-  record('trip.hex', { trip: t.id, loc: { lat: fix.lat, lon: fix.lon } });
+  if (!t || !fix || fix.acc > 150) return;
+  const last = t.lastTrack, key = hexAt(fix.lat, fix.lon);
+  if (last && kmBetween(last, fix) < 0.5 && hexAt(last.lat, last.lon) === key) return;
+  if (last && kmBetween(last, fix) < 0.05) return;
+  record('trip.track', { trip: t.id, loc: { lat: fix.lat, lon: fix.lon } });
 }
 
 function here() {
@@ -197,7 +197,7 @@ function applyTheme() {
 }
 
 const MODE_TABS = {
-  compete: [['flocks', '🐄 Flocks'], ['zombies', '🧟 Zombies'], ['volvos', '🚚 Volvos']],
+  compete: [['flocks', '🐄 Flocks'], ['zombies', '🧟 Zombies'], ['volvos', '🚚 Volvos'], ['fields', '🌽 Fields']],
   together: [['plates', '🚗 License plates']],
 };
 const COMMON_TABS = [['map', '🗺️ Map'], ['realm', '🏰 Realm'], ['stats', '📊 Stats'], ['awards', '🏅 Awards'], ['setup', '⚙️ Trips & players']];
@@ -210,7 +210,7 @@ function render() {
   $('#tabs').innerHTML = tabs.map(([id, label]) => `<button class="tab${db.tab === id ? ' on' : ''}" data-tab="${id}">${label}</button>`).join('');
   const t = state.activeTrip;
   $('#trip-name').textContent = t ? t.name : 'No trip going';
-  const view = { flocks: viewFlocks, zombies: viewZombies, volvos: viewVolvos, plates: viewPlates, map: viewMap, stats: viewStats, awards: viewAwards, setup: viewSetup, realm: viewRealm }[db.tab];
+  const view = { flocks: viewFlocks, zombies: viewZombies, volvos: viewVolvos, fields: viewFields, plates: viewPlates, map: viewMap, stats: viewStats, awards: viewAwards, setup: viewSetup, realm: viewRealm }[db.tab];
   dropMap();
   $('#main').innerHTML = view();
   if (db.tab === 'map') drawMap();
@@ -246,16 +246,30 @@ function noTrip() {
     <button class="big primary" data-act="new-trip">Start a trip</button></div>`;
 }
 
-// One panel per player, side by side.
+// Who's driving and who's in the car, above every game. A passenger taps it
+// to swap drivers or let someone hop in or out at a stop.
+function carBar(t) {
+  const who = t.driver ? `${dot(t.driver)}<b>${playerName(t.driver)}</b>` : '<b>someone not playing</b>';
+  const km = t.driver ? ` · ${num(Math.round(t.by[t.driver].driven))} km` : '';
+  return `<button class="carbar" data-act="car"><span>🚗 Driving: ${who}${km}</span><span class="muted">${num(Math.round(t.km))} km this trip · ${plural(t.aboard.length, 'player', 'players')} in the car</span><span class="change">Change</span></button>`;
+}
+
+// One panel per player in the car, side by side.
 function panels(t, body) {
-  return `<div class="flocks" style="--cols:${Math.min(t.players.length, 4)}">` + t.players.map(pid => {
+  const pids = t.aboard;
+  if (!pids.length) return carBar(t) + `<div class="card center"><p>Nobody's in the car. Tap above to add someone.</p></div>`;
+  return carBar(t) + `<div class="flocks" style="--cols:${Math.min(pids.length, 4)}">` + pids.map(pid => {
     const p = state.players[pid];
-    return `<section class="flock" style="--pc:${p.color}">${body(pid, t.by[pid], p)}</section>`;
+    return `<section class="flock${t.driver === pid ? ' driving' : ''}" style="--pc:${p.color}">${body(pid, t.by[pid], p)}</section>`;
   }).join('') + `</div>`;
+}
+// The panel header: name, a crown for the leader, and the wheel for the driver.
+function phead(t, pid, p, lead, crown) {
+  return `<header><span class="pname">${esc(p.name)}</span>${t.driver === pid ? '<span class="drv" title="Driving">🚗</span>' : ''}${lead(pid) ? `<span class="crown">${crown}</span>` : ''}</header>`;
 }
 
 function leaderOf(t, score) {
-  const best = Math.max(...t.players.map(pid => score(t.by[pid])));
+  const best = Math.max(...t.aboard.map(pid => score(t.by[pid])));
   return pid => best > 0 && score(t.by[pid]) === best;
 }
 
@@ -264,9 +278,9 @@ function viewFlocks() {
   if (!t) return noTrip();
   const lead = leaderOf(t, tp => tp.score);
   return panels(t, (pid, tp, p) => `
-    <header><span class="pname">${esc(p.name)}</span>${lead(pid) ? '<span class="crown">👑</span>' : ''}</header>
+    ${phead(t, pid, p, lead, '👑')}
     <div class="score">${num(tp.score)}</div>
-    <div class="sub">${tp.dead ? `⛪ ${num(tp.dead)} waiting for a church` : `${num(tp.counted)} counted`} · ${plural(tp.deaths, 'death', 'deaths')}</div>
+    <div class="sub">${tp.dead ? `⛪ ${num(tp.dead)} waiting for a church` : `${num(tp.counted)} counted`} · ${plural(tp.deaths, 'death', 'deaths')}${t.driver === pid ? ' · 🛡️ safe from cemeteries while driving' : ''}</div>
     <div class="animals">${ANIMALS.map(a => `<button class="animal" data-act="count" data-player="${pid}" data-animal="${a.id}">
       <span class="icon">${a.icon}</span><span>${a.name}</span><span class="n">${num(tp.byAnimal[a.id] || 0)}</span></button>`).join('')}</div>
     <div class="row">
@@ -281,7 +295,7 @@ function viewZombies() {
   if (!t) return noTrip();
   const lead = leaderOf(t, tp => tp.zombies);
   return panels(t, (pid, tp, p) => `
-    <header><span class="pname">${esc(p.name)}</span>${lead(pid) ? '<span class="crown">🧟</span>' : ''}</header>
+    ${phead(t, pid, p, lead, '🧟')}
     <div class="score">${num(tp.zombies)}</div>
     <div class="sub">zombie flock · one tap each</div>
     <div class="animals">${ZOMBIES.map(z => `<button class="animal zombie" data-act="zombie" data-player="${pid}" data-animal="${z.id}">
@@ -296,12 +310,28 @@ function viewVolvos() {
   if (!t) return noTrip();
   const lead = leaderOf(t, tp => tp.volvoPoints);
   return panels(t, (pid, tp, p) => `
-    <header><span class="pname">${esc(p.name)}</span>${lead(pid) ? '<span class="crown">👑</span>' : ''}</header>
+    ${phead(t, pid, p, lead, '👑')}
     <div class="score">${num(tp.volvoPoints)}</div>
     <div class="sub">points · ${plural(tp.volvos, 'truck', 'trucks')}, ${num(tp.volvoBranded)} with VOLVO (double)</div>
     <div class="colors-grid">${VOLVO_COLORS.map(c => `<button class="vcolor" data-act="volvo" data-player="${pid}" data-color="${c.id}">
       ${swatch(c)}<span>${c.name}</span><span class="n">${num(tp.volvoBy[c.id] || 0)}</span></button>`).join('')}</div>
+    <div class="sub vo-head">Other Volvos</div>
+    <div class="colors-grid">${VOLVO_OTHERS.map(k => `<button class="vcolor" data-act="volvo-other" data-player="${pid}" data-kind="${k.id}" title="${k.note}">
+      <span class="vicon">${k.icon}</span><span>${k.short}<small>${plural(k.points, 'point', 'points')}</small></span><span class="n">${num(tp.volvoKind[k.id] || 0)}</span></button>`).join('')}</div>
     <div class="row"><button class="ghost" data-act="undo" data-game="volvos" data-player="${pid}">↩ Undo</button></div>`);
+}
+
+function viewFields() {
+  const t = state.activeTrip;
+  if (!t) return noTrip();
+  const lead = leaderOf(t, tp => tp.fields);
+  return panels(t, (pid, tp, p) => `
+    ${phead(t, pid, p, lead, '🌽')}
+    <div class="score">${num(tp.fields)}</div>
+    <div class="sub">fields · one tap each puts a farmer in the Realm</div>
+    <div class="animals">${CROPS.map(c => `<button class="animal field" data-act="field" data-player="${pid}" data-crop="${c.id}">
+      <span class="icon">${c.icon}</span><span>${c.name}</span><span class="n">${num(tp.cropBy[c.id] || 0)}</span></button>`).join('')}</div>
+    <div class="row"><button class="ghost" data-act="undo" data-game="fields" data-player="${pid}">↩ Undo</button></div>`);
 }
 
 function viewPlates() {
@@ -311,7 +341,7 @@ function viewPlates() {
   const states = US_STATES.filter(s => t.plates[s]).length;
   const canada = seen.filter(k => k.startsWith('CA-')).length;
   const special = seen.filter(k => PLATES[k] && PLATES[k].country === 'X').length;
-  return `<div class="card plate-head">
+  return carBar(t) + `<div class="card plate-head">
       <div><b class="bignum">${states}</b> of 50 states${t.plates.DC ? ' + DC' : ''}${canada ? ` · ${canada} Canadian` : ''}${special ? ` · ${special} special` : ''}</div>
       <div class="muted">The whole car plays together. Tap a plate when anyone sees it.</div>
       <div class="bar"><div style="width:${states * 2}%"></div></div>
@@ -338,7 +368,7 @@ function viewMap() {
     (geoState === 'needs-https' ? 'Nothing on the map yet. Locations are only saved when the page is opened on its secure address; see Trips &amp; players.' : 'Nothing on the map yet for this trip.');
   return `<div class="card map-head"><select id="map-trip">${trips.map(x => `<option value="${x.id}" ${x.id === t.id ? 'selected' : ''}>${esc(x.name)} · ${fmtDate(x.start)}</option>`).join('')}</select>
     <span class="muted">${note}</span>
-    <div class="chips">${[['flock', '🐄 Flocks'], ['cemetery', '🪦 Cemeteries'], ['church', '⛪ Churches'], ['zombie', '🧟 Zombies'], ['volvo', '🚚 Volvos'], ['plate', '🚗 Plates']].map(([k, l]) => `<span class="chip">${l} ${t.pins.filter(p => p.kind === k).length}</span>`).join('')}</div></div>
+    <div class="chips">${[['flock', '🐄 Flocks'], ['cemetery', '🪦 Cemeteries'], ['church', '⛪ Churches'], ['zombie', '🧟 Zombies'], ['volvo', '🚚 Volvos'], ['field', '🌽 Fields'], ['plate', '🚗 Plates']].map(([k, l]) => `<span class="chip">${l} ${t.pins.filter(p => p.kind === k).length}</span>`).join('')}${t.km >= 1 ? `<span class="chip">🛣️ ${num(Math.round(t.km))} km</span>` : ''}</div></div>
     <div id="map" class="map"></div>`;
 }
 
@@ -361,7 +391,9 @@ function drawMap() {
       .bindPopup(`<b>${esc(p.label)}</b><br>${pl ? esc(pl.name) + ' · ' : ''}${fmtTime(p.ts)}, ${fmtDate(p.ts)}`);
     pts.push([p.lat, p.lon]);
   }
-  if (pts.length > 1) L.polyline(pts, { color: '#2f6f4f', weight: 3, opacity: 0.5, dashArray: '6 6' }).addTo(map);
+  // The route driven, from the saved GPS spots; without any, a dashed line joins the sightings.
+  if (t.track.length > 1) { L.polyline(t.track, { color: '#2e86de', weight: 5, opacity: 0.7 }).addTo(map); pts.push(...t.track); }
+  else if (pts.length > 1) L.polyline(pts, { color: '#2f6f4f', weight: 3, opacity: 0.5, dashArray: '6 6' }).addTo(map);
   if (mapView && mapView.trip === db.mapTrip) map.setView(mapView.c, mapView.z);
   else if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
   else if (fix) map.setView([fix.lat, fix.lon], 11);
@@ -380,7 +412,8 @@ function drawMap() {
 
 const DIRS = ['east', 'north-east', 'north-west', 'west', 'south-west', 'south-east'];
 const purseOf = pid => state.realm.purse[pid] || {};
-const costText = cost => Object.entries(cost).map(([k, n]) => `${n}${RESOURCES.find(r => r.id === k).icon}`).join(' ');
+const resIcon = k => k === 'gold' ? '🪙' : RESOURCES.find(r => r.id === k).icon;
+const costText = cost => Object.entries(cost).map(([k, n]) => `${n}${resIcon(k)}`).join(' ');
 function realmPlayer() {
   const now = realmCurrent(state.realm);
   if (now) return now;
@@ -396,22 +429,39 @@ function viewRealm() {
   const board = pids.map(pid => {
     const p = purseOf(pid);
     return `<tr class="${pid === me ? 'me' : ''}"><td>${dot(pid)}${playerName(pid)}</td><td class="pts">${r.points[pid] || 0}</td>
-      ${RESOURCES.map(x => `<td>${p[x.id] || 0}</td>`).join('')}
+      ${RESOURCES.map(x => `<td>${p[x.id] || 0}</td>`).join('')}<td>${p.gold || 0}</td>
       <td>${r.land[pid] || 0}${r.biggest === pid ? ' 👑' : ''}</td><td>${r.roadLength[pid] || 0}${r.longest === pid ? ' 👑' : ''}</td><td class="rank">${realmRank(r.points[pid] || 0).title}</td></tr>`;
   }).join('');
   return `<div class="card realm-head">
       <h2>🏰 The Realm</h2>
-      <p class="muted">Every sighting with a location claims a hex of the real map. Hexes go to whoever has spotted the most there. When a trip ends, everyone gets paid in resources to build with.</p>
+      <p class="muted">Every sighting with a location claims a hex of the real map, about 10 km across. Hexes go to whoever has spotted the most there. Fields put farmers on the map, and churches found monasteries that earn gold. When a trip ends, everyone gets paid in resources to build with, and the driver gets a wage.</p>
       ${r.turn ? `<div class="turn" style="--pc:${state.players[me].color}"><div><b>${playerName(me)}'s turn</b> <span class="muted">round ${r.turn.round} · next up ${playerName(r.turn.order[(r.turn.i + 1) % r.turn.order.length])}</span>
           <div class="muted">Build, trade or both, then pass the iPad on. Order: ${r.turn.order.map(playerName).join(' → ')}</div></div>
           <button class="primary" data-act="realm-pass" data-player="${me}">✅ End turn</button></div>`
         : `<div class="who">${pids.map(pid => `<button class="${pid === me ? 'on' : ''}" style="--pc:${state.players[pid].color}" data-act="realm-who" data-player="${pid}">${playerName(pid)}</button>`).join('')}</div>`}
-      <div class="scroll"><table class="stats realm"><thead><tr><th></th><th>Points</th>${RESOURCES.map(x => `<th title="${x.name}">${x.icon}</th>`).join('')}<th>Land</th><th>Road</th><th>Rank</th></tr></thead><tbody>${board}</tbody></table></div>
-      <div class="row"><button data-act="realm-trade">🤝 Trade</button><button data-act="realm-bank">🏦 Bank ${BANK_RATE} for 1</button><button class="ghost" data-act="undo" data-game="realm" data-player="">↩ Undo</button><button class="ghost" data-act="realm-rules">❓ How to play</button></div>
+      <div class="scroll"><table class="stats realm"><thead><tr><th></th><th>Points</th>${RESOURCES.map(x => `<th title="${x.name}">${x.icon}</th>`).join('')}<th title="Gold">🪙</th><th>Land</th><th>Road</th><th>Rank</th></tr></thead><tbody>${board}</tbody></table></div>
+      <div class="row"><button data-act="realm-trade">🤝 Trade</button><button data-act="realm-bank">🏦 Bank ${BANK_RATE} for 1</button><button data-act="realm-buy">🪙 Buy for ${GOLD_PRICE} gold</button><button class="ghost" data-act="undo" data-game="realm" data-player="">↩ Undo</button><button class="ghost" data-act="realm-rules">❓ How to play</button></div>
     </div>
+    ${farmCard()}
     ${exploreCard(pids)}
     ${hexes ? `<p class="muted center">Tap a hex to build as <b>${playerName(me)}</b>.</p><div id="realm-map" class="map realm-map"></div>` :
       `<div class="card center"><p>The board is empty. Sightings made on the secure address (with GPS) claim hexes on the map.</p></div>`}`;
+}
+
+function farmCard() {
+  const r = state.realm;
+  const ring = h => hexNeighbors(h.key).filter(k => r.hexes[k]).length;
+  const allFarms = r.farms.filter(f => f.owners.length).sort((a, b) => b.fed - a.fed || b.hexes.length - a.hexes.length);
+  const allMonks = Object.values(r.hexes).filter(h => h.monastery).sort((a, b) => b.monastery.complete - a.monastery.complete || ring(b) - ring(a));
+  if (!allFarms.length && !allMonks.length) return '';
+  const farms = allFarms.slice(0, 5), monks = allMonks.slice(0, 5);
+  const more = (n, one, many) => n > 5 ? `<p class="muted">…and ${plural(n - 5, one, many)} more. Tap a tile on the map for the details.</p>` : '';
+  return `<div class="card"><h2>🌾 Farms and ⛪ monasteries</h2>
+    ${farms.map(f => `<div class="farmrow"><div>🌾 <b>Farm of ${plural(f.hexes.length, 'tile', 'tiles')}</b> · held by ${f.owners.map(p => `${dot(p)}${playerName(p)}`).join(' & ')} <span class="muted">(${Object.entries(f.farmers).map(([p, n]) => `${playerName(p)} ${n}`).join(', ')} farmers)</span></div>
+      <span class="muted">Feeds ${plural(f.settlements, 'settlement', 'settlements')} and ${plural(f.cities, 'city', 'cities')}: ${f.fed} 🌾 a trip${f.cities ? ` and ${plural(f.cities, 'point', 'points')}` : ''}.</span></div>`).join('')}${more(allFarms.length, 'farm', 'farms')}
+    ${monks.map(h => `<div class="farmrow"><div>⛪ <b>${playerName(h.monastery.player)}'s monastery</b> ${h.monastery.complete ? '· ✅ complete, 1 point' : ''}</div>
+      <span class="muted">${ring(h)} of 6 tiles around it visited: ${ring(h)} 🪙 after each trip through it${h.monastery.complete ? '' : `. Visit all 6 for a ${MONASTERY_BONUS} 🪙 bonus and a point`}.</span></div>`).join('')}${more(allMonks.length, 'monastery', 'monasteries')}
+  </div>`;
 }
 
 function exploreCard(pids) {
@@ -441,10 +491,11 @@ function drawRealm() {
   for (const [key, h] of Object.entries(r.hexes)) {
     const g = hexCorners(key), owner = h.owner && state.players[h.owner];
     all.push(...g.corners);
-    L.polygon(g.corners, { color: owner ? owner.color : '#777', weight: 2, fillColor: owner ? owner.color : '#999', fillOpacity: owner ? 0.35 : 0.12 })
+    L.polygon(g.corners, { color: h.farm ? '#e0a800' : owner ? owner.color : '#777', weight: h.farm ? 4 : 2, dashArray: h.farm ? '8 5' : null, fillColor: owner ? owner.color : '#999', fillOpacity: owner ? 0.35 : 0.12 })
       .addTo(map).on('click', () => realmHexSheet(key));
-    const b = h.building && state.players[h.building.player];
-    const label = b ? `<span class="rb" style="background:${b.color}">${BUILDINGS[h.building.kind].icon}</span>` : `<span class="rt">${h.terrain ? TERRAIN[h.terrain].split(' ')[0] : ''}</span>`;
+    const b = h.building && state.players[h.building.player], m = h.monastery && state.players[h.monastery.player];
+    const label = (b ? `<span class="rb" style="background:${b.color}">${BUILDINGS[h.building.kind].icon}</span>` : `<span class="rt">${h.terrain ? TERRAIN[h.terrain].split(' ')[0] : ''}</span>`) +
+      (m ? `<span class="rm" style="background:${m.color}">⛪</span>` : '');
     L.marker(g.center, { icon: L.divIcon({ className: 'hexlabel', html: label, iconSize: [36, 36], iconAnchor: [18, 18] }) }).addTo(map).on('click', () => realmHexSheet(key));
   }
   for (const [k, road] of Object.entries(r.roads)) {
@@ -469,21 +520,26 @@ function realmHexSheet(key) {
   if (!h.building && canSettle(r, me, key)) btn('🏠 Build a settlement', BUILDINGS.settlement.cost, `data-kind="settlement" data-hex="${key}"`);
   if (h.building && h.building.player === me && h.building.kind === 'settlement') btn('🏰 Grow into a city', BUILDINGS.city.cost, `data-kind="city" data-hex="${key}"`);
   hexNeighbors(key).forEach((n, i) => { if (canRoad(r, me, key, n)) btn(`🛣️ Road ${DIRS[i]}`, BUILDINGS.road.cost, `data-kind="road" data-hex="${key}" data-to="${n}"`); });
-  const b = h.building;
+  const b = h.building, m = h.monastery;
+  const farm = h.farm && r.farms.find(f => f.hexes.includes(key));
+  const farmers = Object.entries(h.farmers).map(([p, n]) => `${playerName(p)} ${n}`).join(', ');
   sheet(`<h2>${h.terrain ? TERRAIN[h.terrain] : 'Open country'}</h2>
     <p>Held by <b>${owner}</b>. Sightings here: ${counts}.</p>
+    ${farm ? `<p>🌾 Farmland. Farmers here: ${farmers}. Part of a ${plural(farm.hexes.length, 'tile', 'tiles')} farm held by ${farm.owners.map(playerName).join(' & ')}.</p>` : ''}
+    ${m ? `<p>⛪ ${playerName(m.player)}'s monastery${m.complete ? ', complete' : ''}. It earns 1 🪙 for each visited tile around it, after every trip that passes through here.</p>` : ''}
     ${b ? `<p>${BUILDINGS[b.kind].icon} ${playerName(b.player)}'s ${BUILDINGS[b.kind].name.toLowerCase()}, built ${fmtDate(b.ts)}. It harvests ${b.kind === 'city' ? 2 : 1} ${h.terrain ? RESOURCES.find(x => x.id === h.terrain).icon : ''} after every trip that drives through here.</p>` : ''}
     <h3>${dot(me)}${playerName(me)} can</h3>
     ${opts.length ? `<div class="stack">${opts.join('')}</div>` : `<p class="muted">Nothing to build here yet. Settle hexes you hold, or ones your roads reach. Roads run from your settlements and roads.</p>`}
-    <p class="muted">You have ${RESOURCES.map(x => `${purse[x.id] || 0}${x.icon}`).join(' ')}</p>`);
+    <p class="muted">You have ${RESOURCES.map(x => `${purse[x.id] || 0}${x.icon}`).join(' ')} ${purse.gold || 0}🪙</p>`);
 }
 
+const TRADE_GOODS = [...RESOURCES, { id: 'gold', name: 'Gold', icon: '🪙' }];
 function bundleRows(prefix) {
-  return RESOURCES.map(x => `<label class="res">${x.icon} ${x.name}<input type="number" min="0" max="99" value="0" inputmode="numeric" id="${prefix}-${x.id}"></label>`).join('');
+  return TRADE_GOODS.map(x => `<label class="res">${x.icon} ${x.name}<input type="number" min="0" max="99" value="0" inputmode="numeric" id="${prefix}-${x.id}"></label>`).join('');
 }
 function readBundle(prefix) {
   const out = {};
-  for (const x of RESOURCES) { const n = parseInt(($('#' + prefix + '-' + x.id) || {}).value, 10); if (n > 0) out[x.id] = n; }
+  for (const x of TRADE_GOODS) { const n = parseInt(($('#' + prefix + '-' + x.id) || {}).value, 10); if (n > 0) out[x.id] = n; }
   return out;
 }
 
@@ -505,18 +561,28 @@ function realmBankSheet() {
     <div class="row"><button class="primary" data-act="realm-bank-yes">Trade with the bank</button><button class="ghost" data-act="close">Cancel</button></div>`);
 }
 
+function realmBuySheet() {
+  const me = realmPlayer(), gold = purseOf(me).gold || 0;
+  sheet(`<h2>🪙 Buy with gold</h2><p>${playerName(me)} has ${gold} 🪙. Any resource costs ${GOLD_PRICE} gold.</p>
+    <div class="who">${RESOURCES.map((x, i) => `<label class="chip"><input type="radio" name="buy-res" value="${x.id}" ${i === 0 ? 'checked' : ''}> ${x.icon} ${x.name}</label>`).join('')}</div>
+    <div class="row"><button class="primary" data-act="realm-buy-yes" ${gold >= GOLD_PRICE ? '' : 'disabled'}>Buy 1</button><button class="ghost" data-act="close">Cancel</button></div>`);
+}
+
 function realmRulesSheet() {
   sheet(`<h2>❓ How the Realm works</h2>
     <ul class="rules">
-      <li><b>Claim the map.</b> Every sighting with a location lands on a hex about 20 km across. Whoever has spotted the most in a hex holds it. The board grows with every trip.</li>
+      <li><b>Claim the map.</b> Every sighting with a location lands on a hex about 10 km across. Whoever has spotted the most in a hex holds it. The board grows with every trip.</li>
       <li><b>Get paid after the trip.</b> When a trip ends, everyone gets one of each resource for coming along, plus ${RESOURCES.map(x => `${x.icon} 1 for every ${EARN_EVERY[x.id] === 1 ? '' : EARN_EVERY[x.id] + ' '}${x.from}`).join(', ')}.</li>
+      <li><b>The driver's wage.</b> Driving comes first, so the driver gets 1 resource for every ${WAGE_KM} km they drive (bricks, lumber, ore, grain, wool, in turn), and is topped up to at least the passengers' average for the part of the trip they drove. While driving, their flock is safe from cemeteries.</li>
       <li><b>Cemeteries are the robber.</b> Whoever calls a cemetery takes one resource from each flock they killed when the trip's pay comes in.</li>
+      <li><b>Farms.</b> Every field you spot puts one of your farmers on its tile. Farm tiles that touch make one farm, held by whoever has the most farmers in it (ties share). After every trip, a farm pays its holders 1 🌾 for each settlement and city on it or next to it, whoever built them, and every city it feeds is worth a point to them.</li>
+      <li><b>Monasteries and gold.</b> The first church spotted in a tile with nothing built on it founds a monastery for its spotter. After every trip that passes through its tile, it pays 1 🪙 for each of the 6 tiles around it the family has visited. Once all 6 are visited it's complete: a ${MONASTERY_BONUS} 🪙 bonus and 1 point. Gold buys any resource for ${GOLD_PRICE}, can be traded, and the robber can't touch it.</li>
       <li><b>Build.</b> ${Object.values(BUILDINGS).map(b => `${b.icon} ${b.name}: ${costText(b.cost)}`).join(' · ')}. Settle a hex you hold or one your road reaches. Roads run between neighbouring hexes from your settlements and roads.</li>
       <li><b>Harvest.</b> After every trip that passes through a settled hex, its owner gets 1 of that hex's resource (2 for a city).</li>
       <li><b>Take turns.</b> After every trip a new round starts, and whoever did worst on the trip goes first. On your turn, build and trade as much as you can afford, then tap <b>End turn</b> and pass the iPad. Rounds keep going until the next trip.</li>
       <li><b>Trade.</b> On your turn, swap with anyone who agrees, or with the bank at ${BANK_RATE} for 1.</li>
       <li><b>Ranks.</b> ${REALM_RANKS.map(([n, t]) => `${t} ${n}`).join(' · ')} Realm points. Realm awards count toward your level like every other award.</li>
-      <li><b>Points.</b> Settlement 1, city 2. Longest Road (at least ${LONGEST_ROAD_MIN} in a row) and Biggest Territory (at least ${BIGGEST_LAND_MIN} hexes) are worth 2 each.</li>
+      <li><b>Points.</b> Settlement 1, city 2, complete monastery 1, each city your farm feeds 1. Longest Road (at least ${LONGEST_ROAD_MIN} in a row) and Biggest Territory (at least ${BIGGEST_LAND_MIN} hexes) are worth 2 each.</li>
     </ul>
     <div class="row"><button class="ghost" data-act="close">Got it</button></div>`);
 }
@@ -561,7 +627,22 @@ function viewStats() {
     ['Volvo trucks spotted', l => l.volvos],
     [sub('with VOLVO on the fairing'), l => l.volvoBranded],
     ...VOLVO_COLORS.map(c => [sub(`${swatch(c)}${c.name}`), l => l.volvoBy[c.id] || 0]),
+    ...VOLVO_OTHERS.map(k => [`${k.icon} ${k.name}s`, l => l.volvoKind[k.id] || 0]),
   ]);
+  const fields = table('🌽 Fields, all-time', pids, [
+    ['Fields wins', l => l.wins.fields],
+    ['Fields spotted', l => l.fields],
+    ...CROPS.map(c => [sub(`${c.icon} ${c.name}`), l => l.cropBy[c.id] || 0]),
+  ]);
+  const drivers = `<div class="card"><h2>🚗 Drivers</h2><p class="muted">Kilometres driven, measured by GPS on the secure address. Driver awards count toward levels like every other award.</p>` +
+    [...pids].sort((a, b) => state.life[b].drive.km - state.life[a].drive.km).map((pid, i) => {
+      const x = state.life[pid].drive, rk = driveRank(x.km);
+      const pct = rk.next ? Math.round(100 * (x.km - rk.from) / (rk.next.km - rk.from)) : 100;
+      return `<div class="explorer"><span class="place">${x.km >= 1 ? ['🥇', '🥈', '🥉'][i] || i + 1 : '·'}</span><div>${dot(pid)}<b>${playerName(pid)}</b> · <span class="rank">${rk.title}</span> · <b>${num(Math.round(x.km))}</b> <span class="muted">km</span></div>
+        <span class="muted">${plural(x.trips, 'trip', 'trips')} driven · longest stint ${num(Math.round(x.bestStint))} km${x.night >= 1 ? ` · ${num(Math.round(x.night))} km after dark` : ''}</span>
+        <div class="bar"><div style="width:${pct}%"></div></div>
+        <span class="muted small">${rk.next ? `${num(Math.ceil(rk.next.km - x.km))} km more for ${rk.next.title}` : 'Top rank!'}</span></div>`;
+    }).join('') + `</div>`;
 
   const everPlates = new Set();
   for (const pid of state.playerOrder) for (const k of state.life[pid].uniquePlates) everPlates.add(k);
@@ -569,13 +650,13 @@ function viewStats() {
     <p class="muted">Never seen yet: ${US_STATES.filter(s => !everPlates.has(s)).map(s => PLATES[s].name).join(', ') || 'nothing. You\'ve seen them all!'}</p></div>`;
 
   const win = (t, id) => t.end ? (t.winners[id].map(playerName).join(' & ') || '–') : '…';
-  const history = `<div class="card scroll"><h2>Trips</h2><table class="stats trips"><thead><tr><th>Trip</th><th>When</th><th>🐄 Flocks</th><th>🧟 Zombies</th><th>🚚 Volvos</th><th>🚗 Plates</th><th></th></tr></thead><tbody>` +
+  const history = `<div class="card scroll"><h2>Trips</h2><table class="stats trips"><thead><tr><th>Trip</th><th>When</th><th>🐄 Flocks</th><th>🧟 Zombies</th><th>🚚 Volvos</th><th>🌽 Fields</th><th>🚗 Plates</th><th>🛣️ Distance</th><th></th></tr></thead><tbody>` +
     allTrips().map(t => `<tr><td>${esc(t.name)}${t.end ? '' : ' <span class="live">playing</span>'}</td><td>${fmtDate(t.start)}</td>
-      <td>${win(t, 'flocks')}</td><td>${win(t, 'zombies')}</td><td>${win(t, 'volvos')}</td>
-      <td>${US_STATES.filter(s => t.plates[s]).length} states</td>
+      <td>${win(t, 'flocks')}</td><td>${win(t, 'zombies')}</td><td>${win(t, 'volvos')}</td><td>${t.winners.fields ? win(t, 'fields') : '–'}</td>
+      <td>${US_STATES.filter(s => t.plates[s]).length} states</td><td>${t.km >= 1 ? num(Math.round(t.km)) + ' km' : '–'}</td>
       <td>${t.end ? `<button class="ghost small" data-act="trip-certs" data-trip="${t.id}">🎓 Certificates</button>` : ''}</td></tr>`).join('') +
     `</tbody></table></div>`;
-  return flocks + zombies + volvos + plates + history;
+  return flocks + zombies + volvos + fields + plates + drivers + history;
 }
 
 function viewAwards() {
@@ -624,6 +705,8 @@ const CERT_THEMES = {
   level: ['#f43f5e', '#f59e0b', '#be123c', '#7c3aed'],
   realm: ['#f59e0b', '#10b981', '#b45309', '#047857'],
   explore: ['#0ea5e9', '#22d3ee', '#0369a1', '#0891b2'],
+  fields: ['#eab308', '#84cc16', '#a16207', '#4d7c0f'],
+  drive: ['#64748b', '#f43f5e', '#334155', '#be123c'],
 };
 
 // Confetti scattered round the page, the same every time for the same name.
@@ -711,11 +794,12 @@ function tripCert(pid, tripId) {
     return c.score(tp) > 0 ? ['🥇', '🥈', '🥉'][i] || '' : '';
   };
   const rows = CONTESTS.map(c => `<tr><td>${c.icon} ${c.name}</td><td>${num(c.score(tp))}${c.id === 'volvos' ? ' points' : ''}</td><td>${medal(c)}</td></tr>`).join('') +
-    `<tr><td>🚗 Plates (the whole car)</td><td>${US_STATES.filter(s => trip.plates[s]).length} states</td><td></td></tr>`;
+    `<tr><td>🚗 Plates (the whole car)</td><td>${US_STATES.filter(s => trip.plates[s]).length} states</td><td></td></tr>` +
+    (tp.driven >= 1 ? `<tr><td>🚗 Driving</td><td>${num(Math.round(tp.driven))} km</td><td>🔑</td></tr>` : '');
   const mine = trip.awards.filter(x => x.player === pid);
   const icons = [...new Set(mine.map(x => x.award))].map(id => AWARDS.find(a => a.id === id)).filter(Boolean);
   const body = `<table class="c-table">${rows}</table>${icons.length ? `<div class="c-earned">Awards on this trip: ${icons.map(a => `<span>${a.icon} ${esc(a.name)}</span>`).join('')}</div>` : ''}`;
-  const ribbons = CONTESTS.flatMap(c => endorsements(trip, pid, c.id).map(r => `${c.icon} ${r}`)).slice(0, 5);
+  const ribbons = [...CONTESTS.flatMap(c => endorsements(trip, pid, c.id).map(r => `${c.icon} ${r}`)), ...endorsements(trip, pid, 'drive').map(r => `🚗 ${r}`)].slice(0, 5);
   return certPage({
     kind: 'Road trip legend!', theme: 'trips', name: state.players[pid].name, intro: 'Rode along, played hard and survived:', icon: '🛣️',
     title: `“${esc(trip.name)}”`, ribbons, body,
@@ -727,7 +811,8 @@ function tripCert(pid, tripId) {
 function tripCertsSheet(tripId) {
   const trip = state.trips[tripId];
   if (!trip) return;
-  sheet(`<h2>🎓 Certificates for ${esc(trip.name)}</h2><p class="muted">Pick one to print or save as a PDF.</p>` + trip.players.map(pid => {
+  const r = state.realm, next = r.turn && r.turn.trip === tripId && r.turn.round === 1 && r.turn.i === 0 ? r.turn.order[0] : null;
+  sheet(`<h2>🎓 Certificates for ${esc(trip.name)}</h2>${next ? `<p class="turn-tip">🏰 Next up: the Realm. <b>${playerName(next)}</b> goes first. Open the Realm tab when you've stopped.</p>` : ''}<p class="muted">Pick one to print or save as a PDF.</p>` + trip.players.map(pid => {
     const ids = [...new Set(trip.awards.filter(x => x.player === pid).map(x => x.award))];
     return `<h3>${dot(pid)}${playerName(pid)}</h3><div class="row wrap">
       <button data-act="cert-trip" data-player="${pid}" data-trip="${tripId}">🛣️ Trip certificate</button>
@@ -751,9 +836,10 @@ function hideCert() { $('#cert').classList.remove('open'); document.body.classLi
 function viewSetup() {
   const t = state.activeTrip;
   const trip = t
-    ? `<div class="card"><h2>Playing: ${esc(t.name)}</h2><p>Started ${fmtDate(t.start)} at ${fmtTime(t.start)} with ${t.players.map(playerName).join(', ')}.</p>
+    ? `<div class="card"><h2>Playing: ${esc(t.name)}</h2><p>Started ${fmtDate(t.start)} at ${fmtTime(t.start)}. In the car: ${t.aboard.map(playerName).join(', ') || 'nobody'}. Driving: ${t.driver ? playerName(t.driver) : 'someone not playing'}.</p>
+        <div class="row"><button data-act="car">🚗 Driver and who's in the car</button></div>
         <button class="big" data-act="end-trip">🏁 End this trip</button>
-        <p class="muted">Ending the trip crowns the winners of Flocks, Zombies and Volvos and locks in the scores.</p></div>`
+        <p class="muted">Ending the trip crowns the winners of Flocks, Zombies, Volvos and Fields and locks in the scores.</p></div>`
     : `<div class="card"><h2>No trip going</h2><button class="big primary" data-act="new-trip">Start a trip</button></div>`;
   const players = `<div class="card"><h2>Players</h2><div class="plist">` + state.playerOrder.map(pid => {
     const p = state.players[pid];
@@ -810,9 +896,9 @@ function countSheet(pid, animal) {
 
 function cemeterySheet(pid) {
   const t = state.activeTrip;
-  const others = t.players.filter(x => x !== pid);
-  if (!others.length) { toast('Nobody else to bury'); return; }
-  sheet(`<h2>🪦 ${playerName(pid)} spotted a cemetery!</h2><p>Whose flock dies?</p>
+  const others = t.aboard.filter(x => x !== pid && x !== t.driver);
+  if (!others.length) { toast(t.driver && t.driver !== pid ? `Nobody to bury: ${playerName(t.driver)} is driving, so their flock is safe` : 'Nobody else to bury'); return; }
+  sheet(`<h2>🪦 ${playerName(pid)} spotted a cemetery!</h2><p>Whose flock dies?${t.driver && t.driver !== pid ? ` (${playerName(t.driver)} is driving, so their flock is safe.)` : ''}</p>
     <div class="who pick">${others.map(v => `<label class="pickp" style="--pc:${state.players[v].color}"><input type="checkbox" value="${v}" checked>${playerName(v)} <span class="muted">${num(t.by[v].score)}</span></label>`).join('')}</div>
     <button class="danger big" data-act="cemetery-yes" data-player="${pid}">Kill those flocks</button>`);
 }
@@ -858,7 +944,24 @@ function newTripSheet() {
     <p>Who's playing? (up to ${MAX_PLAYERS})</p>
     <div class="who pick">${pids.map((pid, i) => `<label class="pickp" style="--pc:${state.players[pid].color}"><input type="checkbox" value="${pid}" ${i < MAX_PLAYERS ? 'checked' : ''}>${playerName(pid)}</label>`).join('') || '<p class="muted">No players yet. Add some below.</p>'}</div>
     <div class="row"><input id="new-player-name" placeholder="Add a player's name"><button data-act="add-player-inline">Add</button></div>
+    <label>Who's driving? <select id="driver-in"><option value="">Someone not playing</option>${pids.map(pid => `<option value="${pid}">${playerName(pid)}</option>`).join('')}</select></label>
     <button class="big primary" data-act="start-trip">Let's go!</button>`);
+}
+
+// Swap drivers, or let someone hop in or out of the car.
+function carSheet() {
+  const t = state.activeTrip;
+  if (!t) return;
+  const opt = (pid, label) => `<button class="drvopt${t.driver === pid ? ' primary' : ''}" data-act="set-driver" data-player="${pid || ''}">${t.driver === pid ? '🚗 ' : ''}${label}</button>`;
+  const crew = visiblePlayers().map(pid => {
+    const on = t.aboard.includes(pid);
+    return `<button class="crewp${on ? ' on' : ''}" style="--pc:${state.players[pid].color}" data-act="crew" data-player="${pid}" data-aboard="${on ? 0 : 1}">${on ? '✅' : '➕'} ${playerName(pid)}<small>${on ? 'in the car · tap to hop out' : 'tap to hop in'}</small></button>`;
+  }).join('');
+  sheet(`<h2>🚗 Who's driving?</h2><p class="muted">A passenger taps this; the driver keeps their eyes on the road. The driver earns a wage in the Realm and their flock is safe from cemeteries.</p>
+    <div class="stack">${t.aboard.map(pid => opt(pid, `${dot(pid)}${playerName(pid)}`)).join('')}${opt(null, 'Someone not playing')}</div>
+    <h2>🚙 Who's in the car?</h2><p class="muted">Hop in or out at a stop. You only play while you're in the car (up to ${MAX_PLAYERS}).</p>
+    <div class="who">${crew}</div>
+    <div class="row"><button class="ghost" data-act="close">Done</button></div>`);
 }
 
 function playerSheet(pid) {
@@ -913,6 +1016,29 @@ function onClick(ev) {
       break;
     }
     case 'volvo': volvoSheet(d.player, d.color); break;
+    case 'volvo-other': {
+      const k = VOLVO_OTHERS.find(x => x.id === d.kind);
+      record('volvo.add', { trip: t.id, player: d.player, kind: d.kind });
+      toast(`${k.icon} ${esc(k.name)} for ${playerName(d.player)}!`);
+      break;
+    }
+    case 'field': {
+      const c = CROPS.find(x => x.id === d.crop);
+      record('field.add', { trip: t.id, player: d.player, crop: d.crop });
+      toast(`${c.icon} ${c.name} for ${playerName(d.player)}`);
+      break;
+    }
+    case 'car': carSheet(); break;
+    case 'set-driver':
+      record('trip.driver', { trip: t.id, player: d.player || null });
+      closeSheet();
+      toast(`🚗 ${d.player ? playerName(d.player) : 'Someone not playing'} is driving`);
+      break;
+    case 'crew':
+      if (d.aboard === '1' && t.aboard.length >= MAX_PLAYERS) { toast(`Up to ${MAX_PLAYERS} in the car`); break; }
+      record('trip.crew', { trip: t.id, player: d.player, aboard: d.aboard === '1' });
+      carSheet();
+      break;
     case 'volvo-yes':
       record('volvo.add', { trip: t.id, player: d.player, color: d.color, branded: d.branded === '1' });
       closeSheet();
@@ -945,7 +1071,8 @@ function onClick(ev) {
       if (!players.length) { toast('Pick at least one player'); break; }
       if (players.length > MAX_PLAYERS) { toast(`Up to ${MAX_PLAYERS} players`); break; }
       if (t) record('trip.end', { id: t.id });
-      record('trip.start', { id: newId(), name: $('#trip-name-in').value.trim() || 'Road trip', players });
+      const driver = $('#driver-in').value;
+      record('trip.start', { id: newId(), name: $('#trip-name-in').value.trim() || 'Road trip', players, driver: players.includes(driver) ? driver : null });
       closeSheet();
       db.mode = 'compete';
       db.tab = 'flocks';
@@ -962,7 +1089,8 @@ function onClick(ev) {
       closeSheet();
       const done = state.trips[t.id];
       const lines = CONTESTS.map(c => done.winners[c.id].length ? `${c.icon} ${done.winners[c.id].map(playerName).join(' & ')}` : '').filter(Boolean);
-      toast(lines.length ? `🏆 ${lines.join(' · ')}` : 'Trip ended', true);
+      const first = realmCurrent(state.realm);
+      toast((lines.length ? `🏆 ${lines.join(' · ')}` : 'Trip ended') + (first ? `<br>🏰 Realm: ${playerName(first)} goes first` : ''), true);
       tripCertsSheet(t.id);
       break;
     }
@@ -995,8 +1123,17 @@ function onClick(ev) {
     case 'realm-rules': realmRulesSheet(); break;
     case 'realm-trade': realmTradeSheet(); break;
     case 'realm-bank': realmBankSheet(); break;
+    case 'realm-buy': realmBuySheet(); break;
+    case 'realm-buy-yes': {
+      const res = document.querySelector('input[name=buy-res]:checked').value, me = realmPlayer();
+      if ((purseOf(me).gold || 0) < GOLD_PRICE) { toast(`${playerName(me)} needs ${GOLD_PRICE} gold`); break; }
+      record('realm.buy', { player: me, res, n: 1 });
+      realmBuySheet();
+      toast(`🪙 ${playerName(me)} bought ${RESOURCES.find(x => x.id === res).icon}`);
+      break;
+    }
     case 'realm-build': {
-      record('realm.build', { player: realmPlayer(), kind: d.kind, hex: d.hex, to: d.to });
+      record('realm.build', { grid: GRID, player: realmPlayer(), kind: d.kind, hex: d.hex, to: d.to });
       closeSheet();
       toast(`${BUILDINGS[d.kind].icon} ${playerName(realmPlayer())} built a ${BUILDINGS[d.kind].name.toLowerCase()}!`, true);
       break;

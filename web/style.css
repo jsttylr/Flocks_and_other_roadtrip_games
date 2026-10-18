@@ -369,3 +369,24 @@ button.small { padding: 6px 10px; font-size: 0.85em; }
   .cert-bar { display: none; }
   .cert { width: 10in; box-shadow: none; margin: 0 auto; break-inside: avoid; }
 }
+
+/* Who's driving and who's in the car */
+.carbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; width: 100%; margin: 0 0 12px; padding: 10px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); color: inherit; text-align: left; min-height: 0; }
+.carbar .change { font-weight: 700; color: var(--green); }
+.flock.driving { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--pc) 45%, transparent); }
+.flock header .drv { margin-left: auto; margin-right: 6px; }
+.stack button.drvopt { justify-content: flex-start; gap: 10px; }
+.crewp { flex-direction: column; border: 2px dashed var(--pc); background: transparent; color: var(--ink); font-weight: 700; min-height: 72px; }
+.crewp.on { border-style: solid; background: var(--pc); color: #fff; }
+.crewp small, .vcolor small { display: block; font-weight: 400; font-size: 0.75em; opacity: 0.8; }
+.vo-head { margin: 12px 0 6px; font-weight: 700; }
+.vcolor .vicon { font-size: 1.5em; line-height: 1; }
+.animal.field { background: #f6efd6; }
+:root[data-theme="dark"] .animal.field { background: #29261a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .animal.field { background: #29261a; } }
+.hexlabel .rm { display: grid; place-items: center; position: absolute; right: -10px; top: -8px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; font-size: 12px; }
+.turn-tip { background: color-mix(in srgb, #f59e0b 18%, transparent); border-radius: 12px; padding: 10px 12px; }
+.farmrow { padding: 8px 0; border-top: 1px solid var(--line); }
+.farmrow:first-of-type { border-top: 0; }
+.vcolor span:nth-of-type(2) { text-align: left; }
+.map { position: relative; z-index: 0; } /* keeps the map under pop-ups */
