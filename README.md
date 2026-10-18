@@ -4,7 +4,14 @@
 
 **The car games your family already plays, scored on an iPad and remembered forever.**
 
-Roadtrip Games keeps score for **Flocks**, **Zombie Flocks**, **Volvo trucks** and the **license plate game**. Every sighting is pinned on a map of the trip, and all-time stats and awards pile up across every trip you take.
+Roadtrip Games keeps score for **Flocks**, **Zombie Flocks**, **Volvo trucks** and the **license plate game**. Every sighting is pinned on a map of the trip, and all-time stats pile up across every trip you take.
+
+There's more than the scoreboard:
+
+- **80 awards and player levels**, including awards you can win again on every trip and hidden ones nobody knows about until they're earned.
+- **Printable certificates** for every award, level and trip, signed by Skippy the Magnificent. They're bright and confetti-filled, and made to be handed to a kid in the back seat.
+- **The Realm**, a game a bit like Settlers of Catan for after the trip. Your sightings claim hexes of the real map, earn resources and build roads, settlements and cities across every trip you take.
+- **Explorer scores** for every new bit of map the car drives through.
 
 ![Flocks scoreboard for four players](docs/screenshots/flocks.png)
 
@@ -16,11 +23,11 @@ It's one small program that runs at home on a Windows PC, a Mac, a Raspberry Pi 
 
 - [The games](#the-games)
 - [Trip map](#trip-map)
-- [The Realm](#the-realm)
+- [The Realm](#the-realm) and [Explorers](#-explorers)
 - [Stats and awards](#stats-and-awards)
 - [Printable certificates](#printable-certificates)
 - [Night mode](#night-mode)
-- [Installing](#installing): [Windows](#windows), [Docker Compose](#docker-compose), [Unraid](#unraid)
+- [Installing](#installing): [Windows](#windows), [Docker Compose](#docker-compose), [Unraid](#unraid), [Changing the ports](#changing-the-ports)
 - [Setting up the iPad](#setting-up-the-ipad)
 - [Backups](#backups)
 - [For the curious](#for-the-curious)
@@ -59,7 +66,7 @@ The whole car plays as one team. Tap a state or province the moment anyone sees 
 
 ## Trip map
 
-When the iPad uses the home server's secure address (see [Setting up the iPad](#setting-up-the-ipad)), every cow count, cemetery, church, zombie, Volvo and plate is saved with where it happened. The **Map** tab shows any trip on a free OpenStreetMap map. Pins are coloured by player, and tapping one shows who saw what, and when. Viewing the map needs internet for the map pictures; recording locations doesn't.
+When the iPad uses the home server's secure address (see [Setting up the iPad](#setting-up-the-ipad)), every cow count, cemetery, church, zombie, Volvo and plate is saved with where it happened. The **Map** tab shows any trip on a free OpenStreetMap map. Pins are coloured by player, and tapping one shows who saw what, and when. With GPS on, the iPad also notes each new map tile the trip drives through, for the [Realm](#the-realm) and [Explorers](#-explorers). Viewing the map needs internet for the map pictures; recording locations doesn't.
 
 ![Trip map](docs/screenshots/map.png)
 
@@ -76,11 +83,19 @@ The game you play after the trip, a bit like Settlers of Catan. Every sighting w
 - **Trade:** on your turn, swap with anyone who agrees, or 4 for 1 with the bank.
 - **Points:** settlement 1, city 2, plus 2 each for **Longest Road** and **Biggest Territory**. Points earn ranks, from Wanderer through Squire, Knight, Baron, Count and Duke to Monarch, and 17 Realm awards count toward your level like every other award.
 
-**🧭 Explorers:** with GPS on, the iPad notes every tile the trip drives through, not just the ones with sightings. Every tile the family has never been to is worth 1 explorer point to everyone in the car, and whoever spots something first in a new tile pioneers it for 2 more. Explorer points earn ranks from Homebody to Legend of the Road, and there are 8 exploring awards, such as *Pioneer*, *Off the Map* (20 new tiles on one trip), *Regulars* and *A Thousand Miles*.
-
 Open **🏰 Realm**, see whose turn it is, and tap a hex to build. **❓ How to play** has the full rules.
 
+![Whose turn it is, resources and ranks on the Realm tab](docs/screenshots/realm-tab.png)
+
 ![The Realm: territory, roads and settlements on the trip map](docs/screenshots/realm.png)
+
+### 🧭 Explorers
+
+With GPS on, the iPad notes every tile the trip drives through, not just the ones with sightings. Every tile the family has never been to is worth 1 explorer point to everyone in the car, and whoever spots something first in a new tile pioneers it for 2 more. Explorer points earn ranks from Homebody to Legend of the Road, and there are 8 exploring awards, such as *Pioneer*, *Off the Map* (20 new tiles on one trip), *Regulars* and *A Thousand Miles*.
+
+The **Explorers** card on the Realm tab ranks everyone with medals:
+
+![Explorers leaderboard](docs/screenshots/explorers.png)
 
 ## Stats and awards
 
@@ -176,7 +191,7 @@ Unraid can install it from a template, so you don't have to type the settings yo
 2. From another computer, open the Unraid flash share (`\\tower\flash` on Windows, `smb://tower/flash` on a Mac), and copy the file into `config/plugins/dockerMan/templates-user/`, renamed `my-roadtrip-games.xml`. (If the flash drive isn't shared, turn it on under **Main**, **Flash**, **SMB Security Settings**, or use the terminal command above.)
 3. In the Unraid web page, open the **Docker** tab, click **Add Container**, and pick **roadtrip-games** from the **Template** list under *User templates*.
 4. Check the settings:
-   - **Web page** `8070` and **Secure web page (GPS)** `8443`. Change the left-hand numbers only if something else already uses them.
+   - **Web page** `8070` and **Secure web page (GPS)** `8443`. If something else already uses them, see [Changing the ports](#changing-the-ports).
    - **Game history** `/mnt/user/appdata/roadtrip-games`, where every trip is kept.
    - **Server address for the iPad**: your Unraid server's IP address (shown at the top of the Unraid page), plus `tower.local` or your server's name. If you reach home with Unraid's built-in WireGuard and the iPad uses a different address over the tunnel, add that too, separated by a comma.
 5. Click **Apply**. When it's running, click the container's icon and choose **WebUI** to open it, then carry on with [Setting up the iPad](#setting-up-the-ipad).
@@ -184,6 +199,16 @@ Unraid can install it from a template, so you don't have to type the settings yo
 To update, use **Check for Updates** on the Docker tab, then **Apply Update**. Include `/mnt/user/appdata/roadtrip-games` in your appdata backups.
 
 With no template, **Add Container** works by hand: Repository `ghcr.io/jsttylr/flocks_and_other_roadtrip_games:main`, Network type `bridge`, then **Add another Path, Port, Variable** for port 8070, port 8443, path `/data` → `/mnt/user/appdata/roadtrip-games`, and variable `ROADTRIP_HOSTS` → your server's address.
+
+### Changing the ports
+
+If 8070 or 8443 is already taken, pick any free numbers, for example 9070 and 9443. Change them in both places, and tell the program, so the setup steps on the iPad show the right secure address:
+
+- **Docker Compose:** `ports:` becomes `"9070:9070"` and `"9443:9443"`, and add `ROADTRIP_PORT=9070` and `ROADTRIP_HTTPS_PORT=9443` under `environment:`.
+- **Unraid:** set both the host and container port of each port setting to the new numbers, then **Add another Path, Port, Variable** for `ROADTRIP_PORT` and `ROADTRIP_HTTPS_PORT`.
+- **Windows:** start it with `roadtrip-games.exe -port 9070 -https-port 9443`.
+
+If only the left-hand (host) number changes, the app still works, but the iPad setup card will show the secure address with the old port.
 
 ## Setting up the iPad
 
@@ -219,7 +244,7 @@ The plain and secure addresses keep separate copies on the iPad, so only switch 
 
 ## For the curious
 
-Every tap is saved as a small "event": a cow counted, a cemetery called, a plate found. The iPad keeps them and sends them home, and the server keeps every one in `events.jsonl` and never changes or deletes them. Scores, stats and awards are all worked out from that list. That means stats or awards added later also count everything you've already played, and undo simply records "ignore that one". Two iPads can play the same trip; each sends what it recorded and picks up what the other did.
+Every tap is saved as a small "event": a cow counted, a cemetery called, a plate found, a Realm road built or a trade made. The iPad keeps them and sends them home, and the server keeps every one in `events.jsonl` and never changes or deletes them. Scores, stats and awards are all worked out from that list. That means stats, awards and Realm rules added later also count everything you've already played, and undo simply records "ignore that one". Two iPads can play the same trip; each sends what it recorded and picks up what the other did.
 
 | Option | Docker / Unraid variable | What it does |
 | --- | --- | --- |
