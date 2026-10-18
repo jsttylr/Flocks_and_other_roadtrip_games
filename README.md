@@ -19,7 +19,7 @@ Up to four players. The switch at the top of the screen flips between the **Comp
 
 **Zombies.** Roadkill makes up your zombie flock: deer, rabbits, squirrels, foxes, raccoons and opossums. One tap counts one. Cemeteries and churches don't touch zombies. The biggest zombie flock wins the trip.
 
-**Volvos.** Tap the colour of the Volvo truck you spotted, then choose either "Volvo truck white" or, with VOLVO on the cab fairing, "Volvo truck white Volvo". Whoever spots the most wins the trip.
+**Volvos.** Tap the colour of the Volvo truck you spotted, then choose either "Volvo truck white" (1 point) or, with VOLVO on the cab fairing, "Volvo truck white Volvo" (double, 2 points). The most points wins the trip.
 
 Each panel's **Undo** takes back that player's last tap in that game.
 

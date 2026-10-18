@@ -22,8 +22,8 @@ const ZOMBIES = [
   { id: 'opossum', name: 'Opossums', icon: '🐀' },
 ];
 
-// Volvo trucks, by cab colour. One with VOLVO on the cab fairing is a
-// "Volvo truck <colour> Volvo".
+// Volvo trucks, by cab colour, one point each. One with VOLVO on the cab
+// fairing is a "Volvo truck <colour> Volvo" and scores double.
 const VOLVO_COLORS = [
   { id: 'white', name: 'White', hex: '#f4f4f4' },
   { id: 'black', name: 'Black', hex: '#222222' },
@@ -95,7 +95,7 @@ const AWARDS = [
   { id: 'say_it_twice', game: 'volvos', icon: '🗣️', name: 'Say It Twice', desc: 'Spot a Volvo truck with VOLVO on the fairing', check: c => c.life.volvoBranded >= 1 },
   { id: 'rainbow', game: 'volvos', icon: '🌈', name: 'Rainbow Fleet', desc: 'Spot Volvo trucks in 6 colours on one trip', check: c => c.tp && Object.keys(c.tp.volvoBy).length >= 6 },
   { id: 'convoy', game: 'volvos', icon: '🛻', name: 'Convoy', desc: 'Spot 100 Volvo trucks over all your trips', check: c => c.life.volvos >= 100 },
-  { id: 'volvo_champ', game: 'volvos', icon: '🥇', name: 'Volvo Champion', desc: 'Spot the most Volvo trucks on a trip', check: c => c.life.wins.volvos >= 1 },
+  { id: 'volvo_champ', game: 'volvos', icon: '🥇', name: 'Volvo Champion', desc: 'Score the most Volvo points on a trip', check: c => c.life.wins.volvos >= 1 },
 
   { id: 'first_plate', game: 'plates', icon: '🚗', name: 'Plate Spotters', desc: 'Your car finds its first plate', check: c => c.life.uniquePlates.size >= 1 },
   { id: 'aloha', game: 'plates', icon: '🌺', name: 'Aloha', desc: 'Your car finds a Hawaii plate', check: c => c.life.uniquePlates.has('HI') },
@@ -114,7 +114,7 @@ const AWARDS = [
 const CONTESTS = [
   { id: 'flocks', name: 'Flocks', icon: '🐄', score: tp => tp.score },
   { id: 'zombies', name: 'Zombies', icon: '🧟', score: tp => tp.zombies },
-  { id: 'volvos', name: 'Volvos', icon: '🚚', score: tp => tp.volvos },
+  { id: 'volvos', name: 'Volvos', icon: '🚚', score: tp => tp.volvoPoints },
 ];
 
 function emptyLife() {
@@ -122,13 +122,13 @@ function emptyLife() {
     trips: 0, wins: { flocks: 0, zombies: 0, volvos: 0 },
     animals: 0, byAnimal: {}, biggest: 0, bestFlock: 0,
     kills: 0, deaths: 0, lost: 0, biggestLoss: 0, churches: 0, raised: 0, biggestRaise: 0,
-    zombies: 0, zombieBy: {}, volvos: 0, volvoBy: {}, volvoBranded: 0,
+    zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0,
     uniquePlates: new Set(), awards: {},
   };
 }
 
 function emptyTripPlayer() {
-  return { score: 0, counted: 0, dead: 0, deaths: 0, kills: 0, churches: 0, byAnimal: {}, zombies: 0, zombieBy: {}, volvos: 0, volvoBy: {}, volvoBranded: 0 };
+  return { score: 0, counted: 0, dead: 0, deaths: 0, kills: 0, churches: 0, byAnimal: {}, zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0 };
 }
 
 // A location saved with a sighting, if it looks sane.
@@ -310,6 +310,9 @@ function buildState(events, seenIds) {
         x.tp.volvoBy[color] = (x.tp.volvoBy[color] || 0) + 1;
         x.l.volvos++;
         x.l.volvoBy[color] = (x.l.volvoBy[color] || 0) + 1;
+        const pts = d.branded ? 2 : 1;
+        x.tp.volvoPoints += pts;
+        x.l.volvoPoints += pts;
         if (d.branded) { x.tp.volvoBranded++; x.l.volvoBranded++; }
         pin(x.trip, e, 'volvo', volvoName(color, d.branded), '🚚', d.player);
         award(d.player, x, e);

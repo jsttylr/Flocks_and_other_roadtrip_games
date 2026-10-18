@@ -276,11 +276,11 @@ function swatch(c) { return `<span class="swatch" style="background:${c.hex}"></
 function viewVolvos() {
   const t = state.activeTrip;
   if (!t) return noTrip();
-  const lead = leaderOf(t, tp => tp.volvos);
+  const lead = leaderOf(t, tp => tp.volvoPoints);
   return panels(t, (pid, tp, p) => `
     <header><span class="pname">${esc(p.name)}</span>${lead(pid) ? '<span class="crown">👑</span>' : ''}</header>
-    <div class="score">${num(tp.volvos)}</div>
-    <div class="sub">Volvo trucks · ${num(tp.volvoBranded)} with VOLVO on the fairing</div>
+    <div class="score">${num(tp.volvoPoints)}</div>
+    <div class="sub">points · ${plural(tp.volvos, 'truck', 'trucks')}, ${num(tp.volvoBranded)} with VOLVO (double)</div>
     <div class="colors-grid">${VOLVO_COLORS.map(c => `<button class="vcolor" data-act="volvo" data-player="${pid}" data-color="${c.id}">
       ${swatch(c)}<span>${c.name}</span><span class="n">${num(tp.volvoBy[c.id] || 0)}</span></button>`).join('')}</div>
     <div class="row"><button class="ghost" data-act="undo" data-game="volvos" data-player="${pid}">↩ Undo</button></div>`);
@@ -384,6 +384,7 @@ function viewStats() {
   ]);
   const volvos = table('🚚 Volvo trucks, all-time', pids, [
     ['Volvo wins', l => l.wins.volvos],
+    ['Volvo points', l => l.volvoPoints],
     ['Volvo trucks spotted', l => l.volvos],
     [sub('with VOLVO on the fairing'), l => l.volvoBranded],
     ...VOLVO_COLORS.map(c => [sub(`${swatch(c)}${c.name}`), l => l.volvoBy[c.id] || 0]),
@@ -502,8 +503,8 @@ function volvoSheet(pid, color) {
   const c = VOLVO_COLORS.find(x => x.id === color);
   sheet(`<h2>${dot(pid)}${playerName(pid)}: ${swatch(c)}${c.name} Volvo truck</h2>
     <div class="who volvo-pick">
-      <button data-act="volvo-yes" data-player="${pid}" data-color="${color}" data-branded="0">${esc(volvoName(color, false))}</button>
-      <button data-act="volvo-yes" data-player="${pid}" data-color="${color}" data-branded="1">${esc(volvoName(color, true))}<small>VOLVO on the fairing</small></button>
+      <button data-act="volvo-yes" data-player="${pid}" data-color="${color}" data-branded="0">${esc(volvoName(color, false))}<small>1 point</small></button>
+      <button data-act="volvo-yes" data-player="${pid}" data-color="${color}" data-branded="1">${esc(volvoName(color, true))}<small>VOLVO on the fairing · double points</small></button>
     </div>`);
 }
 

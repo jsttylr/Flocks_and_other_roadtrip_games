@@ -46,6 +46,8 @@ test('zombies and Volvo trucks are their own contests', () => {
   for (const z of ['deer', 'rabbit', 'squirrel', 'fox', 'raccoon', 'opossum']) evs.push(E('zombie.add', { trip: 't1', player: 'kid', animal: z }));
   evs.push(E('volvo.add', { trip: 't1', player: 'mom', color: 'white', branded: true }));
   evs.push(E('volvo.add', { trip: 't1', player: 'mom', color: 'blue' }));
+  evs.push(E('volvo.add', { trip: 't1', player: 'kid', color: 'red' }));
+  evs.push(E('volvo.add', { trip: 't1', player: 'kid', color: 'red' }));
   evs.push(E('flock.cemetery', { trip: 't1', player: 'mom', victims: ['kid'] }));
   evs.push(E('trip.end', { id: 't1' }));
   const st = buildState(evs);
@@ -56,6 +58,8 @@ test('zombies and Volvo trucks are their own contests', () => {
   assert.ok(st.life.kid.awards.zombie_zoo);
   assert.ok(st.life.mom.awards.say_it_twice);
   assert.equal(st.life.mom.volvoBranded, 1);
+  assert.equal(st.trips.t1.by.mom.volvoPoints, 3, 'a Volvo truck white Volvo scores double');
+  assert.equal(st.trips.t1.by.mom.volvos, 2);
   assert.equal(volvoName('white', true), 'Volvo truck white Volvo');
   assert.equal(volvoName('white', false), 'Volvo truck white');
 });
