@@ -455,23 +455,60 @@ function signer() { return { name: db.signer || 'Skippy the Magnificent', title:
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 const longDate = ts => new Date(ts).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 
-function certPage({ kind, name, intro, icon, title, desc, ribbons = [], body = '', when, level }) {
-  const sg = signer();
-  return `<div class="cert"><div class="cert-in">
-    <div class="c-corner tl">✦</div><div class="c-corner tr">✦</div><div class="c-corner bl">✦</div><div class="c-corner br">✦</div>
+const CERT_THEMES = {
+  flocks: ['#22c55e', '#facc15', '#15803d', '#f59e0b'],
+  zombies: ['#a855f7', '#84cc16', '#6d28d9', '#65a30d'],
+  volvos: ['#3b82f6', '#f97316', '#1d4ed8', '#ea580c'],
+  plates: ['#ef4444', '#3b82f6', '#b91c1c', '#1d4ed8'],
+  trips: ['#06b6d4', '#8b5cf6', '#0e7490', '#7c3aed'],
+  level: ['#f43f5e', '#f59e0b', '#be123c', '#7c3aed'],
+};
+
+// Confetti scattered round the page, the same every time for the same name.
+function confetti(seedText, colors) {
+  let seed = 7;
+  for (const ch of seedText) seed = (seed * 31 + ch.charCodeAt(0)) % 2147483647;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  let out = '';
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * 1100, y = rnd() * 850, r = rnd() * 360, c = colors[i % colors.length], k = rnd();
+    const t = `transform="translate(${x.toFixed(0)} ${y.toFixed(0)}) rotate(${r.toFixed(0)})" fill="${c}"`;
+    if (k < 0.3) out += `<rect ${t} x="-9" y="-4" width="18" height="8" rx="2"/>`;
+    else if (k < 0.55) out += `<circle ${t} r="${(4 + rnd() * 6).toFixed(1)}"/>`;
+    else if (k < 0.75) out += `<path ${t} d="M0,-11 L3,-3 11,-3 5,2 7,10 0,5 -7,10 -5,2 -11,-3 -3,-3Z"/>`;
+    else out += `<path ${t.replace(`fill="${c}"`, `fill="none" stroke="${c}"`)} stroke-width="4" stroke-linecap="round" d="M-14,0 q5,-8 10,0 t10,0 t10,0"/>`;
+  }
+  return `<svg class="c-confetti" viewBox="0 0 1100 850" preserveAspectRatio="none" aria-hidden="true">${out}</svg>`;
+}
+
+function starburst(level, colors) {
+  const pts = [];
+  for (let i = 0; i < 32; i++) {
+    const a = (Math.PI * 2 * i) / 32, r = i % 2 ? 40 : 50;
+    pts.push(`${(50 + r * Math.cos(a)).toFixed(1)},${(50 + r * Math.sin(a)).toFixed(1)}`);
+  }
+  return `<div class="c-burst"><svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="${pts.join(' ')}" fill="${colors[1]}" stroke="#fff" stroke-width="2.5"/><circle cx="50" cy="50" r="33" fill="${colors[2]}" stroke="#fff" stroke-width="2"/></svg>
+    <div class="c-burst-in"><small>LEVEL</small><b>${level.level}</b><small>${esc(level.title)}</small></div></div>`;
+}
+
+function certPage({ kind, name, intro, icon, title, desc, ribbons = [], body = '', when, level, theme = 'trips' }) {
+  const sg = signer(), c = CERT_THEMES[theme] || CERT_THEMES.trips;
+  const confettiColors = [c[0], c[1], '#ec4899', '#facc15', '#38bdf8', '#ffffff'];
+  const bits = confetti(name + title, confettiColors);
+  return `<div class="cert" style="--g1:${c[0]};--g2:${c[1]};--a1:${c[2]};--a2:${c[3]}">${bits}<div class="cert-in">${bits}
     <div class="c-brand">🚙 Roadtrip Games</div>
     <div class="c-kind">${kind}</div>
-    <div class="c-small">This certifies that</div>
-    <div class="c-name">${esc(name)}</div>
-    <div class="c-small">${intro}</div>
-    <div class="c-title">${icon ? `<span class="c-icon">${icon}</span>` : ''}${title}</div>
+    <div class="c-hero"><span class="c-rays"></span><span class="c-icon">${icon || '⭐'}</span></div>
+    <div class="c-banner"><span>${title}</span></div>
     ${desc ? `<div class="c-desc">${desc}</div>` : ''}
-    ${ribbons.length ? `<div class="c-ribbons">${ribbons.map(r => `<span>★ ${esc(r)} ★</span>`).join('')}</div>` : ''}
+    <div class="c-small">${intro}</div>
+    <div class="c-name">${esc(name)}</div>
+    ${ribbons.length ? `<div class="c-ribbons">${ribbons.map(r => `<span>${esc(r)}</span>`).join('')}</div>` : ''}
     ${body}
     ${when ? `<div class="c-when">${when}</div>` : ''}
     <div class="c-foot">
       <div class="c-sig"><div class="c-sig-name">${esc(sg.name)}</div><div class="c-sig-line"></div><div class="c-sig-title">${esc(sg.title)}</div></div>
-      <div class="c-seal"><div class="c-seal-in"><small>LEVEL</small><b>${level.level}</b><small>${esc(level.title)}</small></div></div>
+      ${starburst(level, c)}
       <div class="c-sig"><div class="c-sig-name">&nbsp;</div><div class="c-sig-line"></div><div class="c-sig-title">Grown-up in charge</div></div>
     </div></div></div>`;
 }
@@ -485,9 +522,9 @@ function awardCert(pid, awardId, tripId) {
   const at = trip ? (trip.awards.find(x => x.player === pid && x.award === awardId) || {}).ts : got.ts;
   const lvl = levelFor(trip && trip.end && trip.badgesAtEnd[pid] !== undefined ? trip.badgesAtEnd[pid] : l.badges);
   return certPage({
-    kind: a.hidden ? 'Certificate of Secret Achievement' : 'Certificate of Achievement',
-    name: state.players[pid].name, intro: 'has earned the award', icon: a.icon,
-    title: esc(a.name) + (n > 1 ? ` <span class="c-times">for the ${ordinal(n)} time</span>` : ''),
+    kind: a.hidden ? 'Secret award unlocked!' : 'Award unlocked!', theme: a.game === 'trips' ? 'trips' : a.game,
+    name: state.players[pid].name, intro: 'Officially awarded to', icon: a.icon,
+    title: esc(a.name) + (n > 1 ? ` <span class="c-times">×${n}</span>` : ''),
     desc: esc(a.desc), ribbons: trip ? endorsements(trip, pid, a.game) : [],
     when: `${trip ? `On the trip “${esc(trip.name)}”, ` : ''}${longDate(at || got.ts)}`, level: lvl,
   });
@@ -498,7 +535,7 @@ function levelCert(pid) {
   const wins = l.wins.flocks + l.wins.zombies + l.wins.volvos;
   const ribbons = [plural(l.trips, 'trip', 'trips'), plural(wins, 'win', 'wins'), plural(Object.keys(l.awards).length, 'different award', 'different awards')];
   return certPage({
-    kind: 'Certificate of Rank', name: state.players[pid].name, intro: 'has reached the rank of', icon: '⭐',
+    kind: 'Level up!', theme: 'level', name: state.players[pid].name, intro: 'Promoted with honours:', icon: '🚀',
     title: `Level ${lv.level} · ${esc(lv.title)}`, desc: `By earning ${plural(l.badges, 'award', 'awards')} on the road, repeats included`,
     ribbons, when: longDate(Date.now()), level: lv,
   });
@@ -518,7 +555,7 @@ function tripCert(pid, tripId) {
   const body = `<table class="c-table">${rows}</table>${icons.length ? `<div class="c-earned">Awards on this trip: ${icons.map(a => `<span>${a.icon} ${esc(a.name)}</span>`).join('')}</div>` : ''}`;
   const ribbons = CONTESTS.flatMap(c => endorsements(trip, pid, c.id).map(r => `${c.icon} ${r}`)).slice(0, 5);
   return certPage({
-    kind: 'Road Trip Certificate', name: state.players[pid].name, intro: 'rode along and played on', icon: '🛣️',
+    kind: 'Road trip legend!', theme: 'trips', name: state.players[pid].name, intro: 'Rode along, played hard and survived:', icon: '🛣️',
     title: `“${esc(trip.name)}”`, ribbons, body,
     when: `${longDate(trip.start)}${trip.end && new Date(trip.end).toDateString() !== new Date(trip.start).toDateString() ? ' to ' + longDate(trip.end) : ''}`,
     level: levelFor(trip.badgesAtEnd[pid] !== undefined ? trip.badgesAtEnd[pid] : state.life[pid].badges),
