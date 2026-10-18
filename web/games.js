@@ -49,13 +49,15 @@ const PLATE_REGIONS = [
   { name: 'Southwest', country: 'US', plates: [['AZ', 'Arizona'], ['NM', 'New Mexico'], ['OK', 'Oklahoma'], ['TX', 'Texas']] },
   { name: 'West', country: 'US', plates: [['AK', 'Alaska'], ['CA', 'California'], ['CO', 'Colorado'], ['HI', 'Hawaii'], ['ID', 'Idaho'], ['MT', 'Montana'], ['NV', 'Nevada'], ['OR', 'Oregon'], ['UT', 'Utah'], ['WA', 'Washington'], ['WY', 'Wyoming']] },
   { name: 'Canada', country: 'CA', plates: [['AB', 'Alberta'], ['BC', 'British Columbia'], ['MB', 'Manitoba'], ['NB', 'New Brunswick'], ['NL', 'Newfoundland'], ['NS', 'Nova Scotia'], ['NT', 'NW Territories'], ['NU', 'Nunavut'], ['ON', 'Ontario'], ['PE', 'PEI'], ['QC', 'Quebec'], ['SK', 'Saskatchewan'], ['YT', 'Yukon']] },
+  { name: 'Mexico & special plates', country: 'X', plates: [['MX', 'Mexico'], ['PR', 'Puerto Rico'], ['DPL', 'Diplomat'], ['USG', 'US Government']] },
 ];
 
 // Plate codes are unique once Canadian ones get a "CA-" prefix (some letters overlap with states).
+const plateKey = (region, code) => region.country === 'CA' ? 'CA-' + code : code;
 const PLATES = {};
 for (const r of PLATE_REGIONS) {
   for (const [code, name] of r.plates) {
-    const key = r.country === 'CA' ? 'CA-' + code : code;
+    const key = plateKey(r, code);
     PLATES[key] = { key, code, name, region: r.name, country: r.country };
   }
 }
@@ -64,16 +66,34 @@ const US_STATES = Object.values(PLATES).filter(p => p.country === 'US' && p.key 
 const PLAYER_COLORS = ['#e4572e', '#2e86de', '#20bf6b', '#f7b731', '#8854d0', '#eb3b5a', '#0fb9b1', '#a5673f'];
 const MAX_PLAYERS = 4;
 
+// Dates for the hidden awards, in the iPad's own time zone.
+const day = ts => { const d = new Date(ts); return { m: d.getMonth() + 1, d: d.getDate(), wd: d.getDay(), h: d.getHours(), y: d.getFullYear() }; };
+// Within about a day of a full moon (counted from a known new moon).
+function fullMoon(ts) {
+  const age = (((ts - Date.UTC(2000, 0, 6, 18, 14)) / 86400000) % 29.530589 + 29.530589) % 29.530589;
+  return Math.abs(age - 14.765) <= 1.1;
+}
+// Easter Sunday (Gregorian), as month and day.
+function easter(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  return { m: Math.floor((h + l - 7 * m + 114) / 31), d: ((h + l - 7 * m + 114) % 31) + 1 };
+}
+const zombieOn = (c, test) => c.e.type === 'zombie.add' && test(day(c.e.ts), c.e);
+
 // Awards. Each check looks at one player: their lifetime totals (life) and,
-// during a trip, their part of that trip (tp). License plates are played
-// together, so plate awards go to everyone in the car.
+// during a trip, their part of that trip (tp), plus the event (e) that just
+// happened. License plates are played together, so plate awards go to everyone
+// in the car. A "repeat" award can be earned again on every trip; a "hidden"
+// one shows as a mystery until someone earns it.
 const AWARDS = [
   { id: 'first_flock', game: 'flocks', icon: '🐣', name: 'Little Bo Peep', desc: 'Count your first animal', check: c => c.life.animals >= 1 },
   { id: 'shepherd', game: 'flocks', icon: '🧑‍🌾', name: 'Shepherd', desc: 'Count 100 animals over all your trips', check: c => c.life.animals >= 100 },
   { id: 'rancher', game: 'flocks', icon: '🤠', name: 'Rancher', desc: 'Count 1,000 animals over all your trips', check: c => c.life.animals >= 1000 },
   { id: 'cattle_baron', game: 'flocks', icon: '👑', name: 'Cattle Baron', desc: 'Count 10,000 animals over all your trips', check: c => c.life.animals >= 10000 },
   { id: 'big_herd', game: 'flocks', icon: '🐃', name: 'Big Herd', desc: 'Count 50 or more animals in one go', check: c => c.life.biggest >= 50 },
-  { id: 'century', game: 'flocks', icon: '💯', name: 'Century Flock', desc: 'Have 100 or more in your flock at once', check: c => c.tp && c.tp.score >= 100 },
+  { id: 'century', repeat: true, game: 'flocks', icon: '💯', name: 'Century Flock', desc: 'Have 100 or more in your flock at once', check: c => c.tp && c.tp.score >= 100 },
   { id: 'chicken_run', game: 'flocks', icon: '🐓', name: 'Chicken Run', desc: 'Count 100 chickens over all your trips', check: c => (c.life.byAnimal.chicken || 0) >= 100 },
   { id: 'grim_reaper', game: 'flocks', icon: '💀', name: 'Grim Reaper', desc: 'Call a cemetery on someone\'s flock', check: c => c.life.kills >= 1 },
   { id: 'undertaker', game: 'flocks', icon: '⚰️', name: 'Undertaker', desc: 'Kill 25 flocks with cemeteries', check: c => c.life.kills >= 25 },
@@ -81,34 +101,63 @@ const AWARDS = [
   { id: 'heartbreak', game: 'flocks', icon: '💔', name: 'Heartbreak', desc: 'Lose a flock of 100 or more at once', check: c => c.life.biggestLoss >= 100 },
   { id: 'hallelujah', game: 'flocks', icon: '⛪', name: 'Hallelujah', desc: 'Bring your flock back with a church', check: c => c.life.churches >= 1 },
   { id: 'miracle', game: 'flocks', icon: '😇', name: 'Miracle', desc: 'Bring back 100 or more animals with one church', check: c => c.life.biggestRaise >= 100 },
-  { id: 'champion', game: 'flocks', icon: '🏆', name: 'Flock Champion', desc: 'Have the biggest flock at the end of a trip', check: c => c.life.wins.flocks >= 1 },
+  { id: 'champion', repeat: true, game: 'flocks', icon: '🏆', name: 'Flock Champion', desc: 'Have the biggest flock at the end of a trip', check: c => c.won && c.won.includes('flocks') },
   { id: 'dynasty', game: 'flocks', icon: '🏰', name: 'Dynasty', desc: 'Win Flocks on 5 trips', check: c => c.life.wins.flocks >= 5 },
-  { id: 'comeback', game: 'flocks', icon: '🔥', name: 'Comeback Kid', desc: 'Win Flocks on a trip where you lost your flock', check: c => c.won && c.won.includes('flocks') && c.tp.deaths > 0 },
+  { id: 'comeback', repeat: true, game: 'flocks', icon: '🔥', name: 'Comeback Kid', desc: 'Win Flocks on a trip where you lost your flock', check: c => c.won && c.won.includes('flocks') && c.tp.deaths > 0 },
+  { id: 'old_macdonald', repeat: true, game: 'flocks', icon: '🚜', name: 'Old MacDonald', desc: 'Count all seven kinds of animal on one trip', check: c => c.tp && ANIMALS.every(a => c.tp.byAnimal[a.id]) },
+  { id: 'triple_crown', repeat: true, game: 'flocks', icon: '🎖️', name: 'Triple Crown', desc: 'Win Flocks, Zombies and Volvos on the same trip', check: c => c.won && c.won.length === 3 },
+  { id: 'ghost_story', hidden: true, repeat: true, game: 'flocks', icon: '👻', name: 'Ghost Story', desc: 'Call a cemetery on Halloween', check: c => c.e.type === 'flock.cemetery' && day(c.e.ts).m === 10 && day(c.e.ts).d === 31 },
+  { id: 'easter', hidden: true, repeat: true, game: 'flocks', icon: '🥚', name: 'He Is Risen', desc: 'Bring your flock back with a church on Easter Sunday', check: c => { if (c.e.type !== 'flock.church') return false; const t = day(c.e.ts), x = easter(t.y); return t.m === x.m && t.d === x.d; } },
 
   { id: 'first_zombie', game: 'zombies', icon: '🧟', name: 'Zombie Spotter', desc: 'Spot your first zombie', check: c => c.life.zombies >= 1 },
   { id: 'zombie_hunter', game: 'zombies', icon: '🔦', name: 'Zombie Hunter', desc: 'Spot 25 zombies over all your trips', check: c => c.life.zombies >= 25 },
   { id: 'apocalypse', game: 'zombies', icon: '☣️', name: 'Zombie Apocalypse', desc: 'Spot 100 zombies over all your trips', check: c => c.life.zombies >= 100 },
-  { id: 'zombie_zoo', game: 'zombies', icon: '🎃', name: 'Zombie Zoo', desc: 'Spot all six kinds of zombie on one trip', check: c => c.tp && ZOMBIES.every(z => c.tp.zombieBy[z.id]) },
-  { id: 'zombie_king', game: 'zombies', icon: '🦴', name: 'Zombie King', desc: 'Have the biggest zombie flock at the end of a trip', check: c => c.life.wins.zombies >= 1 },
+  { id: 'zombie_zoo', repeat: true, game: 'zombies', icon: '🐾', name: 'Zombie Zoo', desc: 'Spot all six kinds of zombie on one trip', check: c => c.tp && ZOMBIES.every(z => c.tp.zombieBy[z.id]) },
+  { id: 'zombie_king', repeat: true, game: 'zombies', icon: '🦴', name: 'Zombie King', desc: 'Have the biggest zombie flock at the end of a trip', check: c => c.won && c.won.includes('zombies') },
+  { id: 'oh_deer', repeat: true, game: 'zombies', icon: '🦌', name: 'Oh Deer', desc: 'Spot 10 zombie deer on one trip', check: c => c.tp && (c.tp.zombieBy.deer || 0) >= 10 },
+  { id: 'halloween', hidden: true, repeat: true, game: 'zombies', icon: '🎃', name: 'Trick or Treat', desc: 'Spot a zombie on Halloween', check: c => zombieOn(c, t => t.m === 10 && t.d === 31) },
+  { id: 'dia_muertos', hidden: true, repeat: true, game: 'zombies', icon: '🌼', name: 'Día de los Muertos', desc: 'Spot a zombie on the Day of the Dead (November 1 or 2)', check: c => zombieOn(c, t => t.m === 11 && t.d <= 2) },
+  { id: 'friday13', hidden: true, repeat: true, game: 'zombies', icon: '🔪', name: 'Friday the 13th', desc: 'Spot a zombie on Friday the 13th', check: c => zombieOn(c, t => t.wd === 5 && t.d === 13) },
+  { id: 'witching_hour', hidden: true, repeat: true, game: 'zombies', icon: '🕛', name: 'Witching Hour', desc: 'Spot a zombie between midnight and 3 in the morning', check: c => zombieOn(c, t => t.h < 3) },
+  { id: 'full_moon', hidden: true, repeat: true, game: 'zombies', icon: '🌕', name: 'Bad Moon Rising', desc: 'Spot a zombie on the night of a full moon', check: c => zombieOn(c, () => fullMoon(c.e.ts)) },
+  { id: 'rudolph', hidden: true, repeat: true, game: 'zombies', icon: '🎄', name: 'Grandma Got Run Over', desc: 'Spot a zombie deer on Christmas Eve or Christmas Day', check: c => zombieOn(c, (t, e) => e.data.animal === 'deer' && t.m === 12 && (t.d === 24 || t.d === 25)) },
 
   { id: 'first_volvo', game: 'volvos', icon: '🚚', name: 'Truck Spotter', desc: 'Spot your first Volvo truck', check: c => c.life.volvos >= 1 },
   { id: 'say_it_twice', game: 'volvos', icon: '🗣️', name: 'Say It Twice', desc: 'Spot a Volvo truck with VOLVO on the fairing', check: c => c.life.volvoBranded >= 1 },
-  { id: 'rainbow', game: 'volvos', icon: '🌈', name: 'Rainbow Fleet', desc: 'Spot Volvo trucks in 6 colours on one trip', check: c => c.tp && Object.keys(c.tp.volvoBy).length >= 6 },
+  { id: 'rainbow', repeat: true, game: 'volvos', icon: '🌈', name: 'Rainbow Fleet', desc: 'Spot Volvo trucks in 6 colours on one trip', check: c => c.tp && Object.keys(c.tp.volvoBy).length >= 6 },
   { id: 'convoy', game: 'volvos', icon: '🛻', name: 'Convoy', desc: 'Spot 100 Volvo trucks over all your trips', check: c => c.life.volvos >= 100 },
-  { id: 'volvo_champ', game: 'volvos', icon: '🥇', name: 'Volvo Champion', desc: 'Score the most Volvo points on a trip', check: c => c.life.wins.volvos >= 1 },
+  { id: 'volvo_champ', repeat: true, game: 'volvos', icon: '🥇', name: 'Volvo Champion', desc: 'Score the most Volvo points on a trip', check: c => c.won && c.won.includes('volvos') },
+  { id: 'fleet', repeat: true, game: 'volvos', icon: '🚛', name: 'Fleet Manager', desc: 'Spot 25 Volvo trucks on one trip', check: c => c.tp && c.tp.volvos >= 25 },
 
   { id: 'first_plate', game: 'plates', icon: '🚗', name: 'Plate Spotters', desc: 'Your car finds its first plate', check: c => c.life.uniquePlates.size >= 1 },
   { id: 'aloha', game: 'plates', icon: '🌺', name: 'Aloha', desc: 'Your car finds a Hawaii plate', check: c => c.life.uniquePlates.has('HI') },
   { id: 'last_frontier', game: 'plates', icon: '🐻', name: 'Last Frontier', desc: 'Your car finds an Alaska plate', check: c => c.life.uniquePlates.has('AK') },
   { id: 'capital', game: 'plates', icon: '🏛️', name: 'Capital Idea', desc: 'Your car finds a Washington DC plate', check: c => c.life.uniquePlates.has('DC') },
   { id: 'oh_canada', game: 'plates', icon: '🍁', name: 'Oh Canada', desc: 'Your car finds a Canadian plate', check: c => [...c.life.uniquePlates].some(k => k.startsWith('CA-')) },
-  { id: 'coast_to_coast', game: 'plates', icon: '🌊', name: 'Coast to Coast', desc: 'Maine and California on the same trip', check: c => c.trip && c.trip.plates.ME && c.trip.plates.CA },
-  { id: 'half_way', game: 'plates', icon: '🗺️', name: 'Halfway There', desc: '25 states on one trip', check: c => c.trip && US_STATES.filter(s => c.trip.plates[s]).length >= 25 },
-  { id: 'full_house', game: 'plates', icon: '🎉', name: 'Full House', desc: 'All 50 states on one trip', check: c => c.trip && US_STATES.every(s => c.trip.plates[s]) },
+  { id: 'hola', game: 'plates', icon: '🌮', name: '¡Hola, México!', desc: 'Your car finds a Mexican plate', check: c => c.life.uniquePlates.has('MX') },
+  { id: 'isla', game: 'plates', icon: '🏝️', name: 'Isla del Encanto', desc: 'Your car finds a Puerto Rico plate', check: c => c.life.uniquePlates.has('PR') },
+  { id: 'diplomat', game: 'plates', icon: '🕴️', name: 'Diplomatic Immunity', desc: 'Your car finds a diplomat plate', check: c => c.life.uniquePlates.has('DPL') },
+  { id: 'gov_issue', game: 'plates', icon: '🦅', name: 'Government Issue', desc: 'Your car finds a US Government plate', check: c => c.life.uniquePlates.has('USG') },
+  { id: 'border_to_border', repeat: true, game: 'plates', icon: '🧭', name: 'Border to Border', desc: 'A Canadian and a Mexican plate on the same trip', check: c => c.trip && c.trip.plates.MX && Object.keys(c.trip.plates).some(k => k.startsWith('CA-')) },
+  { id: 'coast_to_coast', repeat: true, game: 'plates', icon: '🌊', name: 'Coast to Coast', desc: 'Maine and California on the same trip', check: c => c.trip && c.trip.plates.ME && c.trip.plates.CA },
+  { id: 'half_way', repeat: true, game: 'plates', icon: '🗺️', name: 'Halfway There', desc: '25 states on one trip', check: c => c.trip && US_STATES.filter(s => c.trip.plates[s]).length >= 25 },
+  { id: 'full_house', repeat: true, game: 'plates', icon: '🧹', name: 'Clean Sweep', desc: 'All 50 states on one trip', check: c => c.trip && US_STATES.every(s => c.trip.plates[s]) },
   { id: 'fifty_club', game: 'plates', icon: '🇺🇸', name: 'Fifty Club', desc: 'All 50 states over all your trips', check: c => US_STATES.every(s => c.life.uniquePlates.has(s)) },
 
+  { id: 'buckle_up', game: 'trips', icon: '🚙', name: 'Buckle Up', desc: 'Play your first trip', check: c => c.life.trips >= 1 },
   { id: 'road_warrior', game: 'trips', icon: '🛣️', name: 'Road Warrior', desc: 'Play on 10 trips', check: c => c.life.trips >= 10 },
+  { id: 'globetrotter', game: 'trips', icon: '🧳', name: 'Globetrotter', desc: 'Play on 25 trips', check: c => c.life.trips >= 25 },
 ];
+
+// Levels go up with every award earned, repeats included, like badges on a
+// watch. Each level needs one more award than the last: 1, 2, 3, ...
+const LEVEL_TITLES = ['Passenger', 'Backseat Spotter', 'Window Watcher', 'Road Scout', 'Navigator', 'Trailblazer', 'Road Tripper', 'Highway Hero', 'Road Royalty', 'Grand Tourer'];
+function levelFor(n) {
+  let level = 1, need = 0;
+  while (n >= need + level) { need += level; level++; }
+  const title = LEVEL_TITLES[Math.min(level, LEVEL_TITLES.length) - 1];
+  return { level, title, badges: n, from: need, to: need + level };
+}
 
 // The games decided at the end of a trip, and the score each is decided on.
 const CONTESTS = [
@@ -123,7 +172,7 @@ function emptyLife() {
     animals: 0, byAnimal: {}, biggest: 0, bestFlock: 0,
     kills: 0, deaths: 0, lost: 0, biggestLoss: 0, churches: 0, raised: 0, biggestRaise: 0,
     zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0,
-    uniquePlates: new Set(), awards: {},
+    uniquePlates: new Set(), awards: {}, badges: 0,
   };
 }
 
@@ -147,17 +196,25 @@ function buildState(events, seenIds) {
   const st = { players: {}, playerOrder: [], trips: {}, tripOrder: [], life: {}, newAwards: [], undone };
 
   const life = pid => st.life[pid] || (st.life[pid] = emptyLife());
+  // l.awards[id] is { ts, trip } of the first time, plus count, the last time
+  // and the trips it was earned on (a repeat award once per trip).
   const award = (pid, ctx, e) => {
     const l = life(pid);
+    const before = levelFor(l.badges).level;
+    const tripId = ctx.trip ? ctx.trip.id : null;
     for (const a of AWARDS) {
-      if (l.awards[a.id]) continue;
+      const got = l.awards[a.id];
+      if (got && (!a.repeat || !tripId || got.trips.includes(tripId))) continue;
       let ok = false;
-      try { ok = !!a.check({ life: l, ...ctx }); } catch (_) { ok = false; }
-      if (ok) {
-        l.awards[a.id] = { ts: e.ts, trip: ctx.trip ? ctx.trip.id : null };
-        if (seenIds && !seenIds.has(e.id)) st.newAwards.push({ player: pid, award: a.id });
-      }
+      try { ok = !!a.check({ life: l, e, ...ctx }); } catch (_) { ok = false; }
+      if (!ok) continue;
+      if (got) { got.count++; got.last = { ts: e.ts, trip: tripId }; got.trips.push(tripId); }
+      else l.awards[a.id] = { ts: e.ts, trip: tripId, count: 1, last: { ts: e.ts, trip: tripId }, trips: tripId ? [tripId] : [] };
+      l.badges++;
+      if (seenIds && !seenIds.has(e.id)) st.newAwards.push({ player: pid, award: a.id, count: l.awards[a.id].count });
     }
+    const after = levelFor(l.badges);
+    if (after.level > before && seenIds && !seenIds.has(e.id)) st.newAwards.push({ player: pid, level: after });
   };
   // A sighting on the map.
   const pin = (trip, e, kind, label, icon, pid) => {
@@ -359,4 +416,4 @@ function lastUndoable(events, st, tripId, playerId, game) {
   return best;
 }
 
-if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };
+if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };

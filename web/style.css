@@ -172,6 +172,14 @@ table.stats { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .award.got { opacity: 1; filter: none; border: 2px solid var(--amber); }
 .aicon { font-size: 2em; }
 .when { font-size: 0.8em; color: var(--amber); font-weight: 700; }
+.award.secret { opacity: 0.7; border: 2px dashed var(--line); }
+.times { margin-left: 6px; background: var(--amber); color: #fff; border-radius: 99px; padding: 0 8px; font-size: 0.85em; font-weight: 800; }
+.again { white-space: nowrap; }
+.level { display: flex; gap: 14px; align-items: center; margin: 4px 0 14px; }
+.level > div { flex: 1; }
+.level .bar { margin-top: 6px; }
+.level .bar div { background: var(--amber); }
+.lvl { flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-size: 1.6em; font-weight: 800; color: #fff; background: var(--amber); }
 
 /* Setup */
 .plist { margin-bottom: 10px; }

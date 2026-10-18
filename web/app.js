@@ -53,11 +53,15 @@ function record(type, data) {
 
 function refresh(seenBefore) {
   state = buildState(db.events, seenBefore || null);
+  const lines = [];
   for (const n of state.newAwards) {
-    const a = AWARDS.find(x => x.id === n.award);
     const p = state.players[n.player];
-    if (a && p) toast(`${a.icon} ${esc(p.name)} earned <b>${a.name}</b>!`, true);
+    if (!p) continue;
+    if (n.level) { lines.push(`⭐ ${esc(p.name)} reached <b>level ${n.level.level}</b>, ${n.level.title}!`); continue; }
+    const a = AWARDS.find(x => x.id === n.award);
+    if (a) lines.push(`${a.icon} ${esc(p.name)} earned <b>${a.name}</b>${n.count > 1 ? ` (×${n.count})` : ''}!`);
   }
+  if (lines.length) toast(lines.join('<br>'), true);
   render();
 }
 
@@ -292,12 +296,13 @@ function viewPlates() {
   const seen = Object.keys(t.plates);
   const states = US_STATES.filter(s => t.plates[s]).length;
   const canada = seen.filter(k => k.startsWith('CA-')).length;
+  const special = seen.filter(k => PLATES[k] && PLATES[k].country === 'X').length;
   return `<div class="card plate-head">
-      <div><b class="bignum">${states}</b> of 50 states${t.plates.DC ? ' + DC' : ''}${canada ? ` · ${canada} Canadian` : ''}</div>
+      <div><b class="bignum">${states}</b> of 50 states${t.plates.DC ? ' + DC' : ''}${canada ? ` · ${canada} Canadian` : ''}${special ? ` · ${special} special` : ''}</div>
       <div class="muted">The whole car plays together. Tap a plate when anyone sees it.</div>
       <div class="bar"><div style="width:${states * 2}%"></div></div>
     </div>` + PLATE_REGIONS.map(r => `<h3 class="region">${r.name}</h3><div class="plates">` + r.plates.map(([code, name]) => {
-    const key = r.country === 'CA' ? 'CA-' + code : code;
+    const key = plateKey(r, code);
     const s = t.plates[key];
     return `<button class="plate${s ? ' seen' : ''}" data-act="plate" data-plate="${key}">
       <span class="code">${code}</span><span class="pl-name">${name}</span>${s ? `<span class="by">${fmtTime(s.ts)}</span>` : ''}</button>`;
@@ -400,7 +405,7 @@ function viewStats() {
 
   const everPlates = new Set();
   for (const pid of state.playerOrder) for (const k of state.life[pid].uniquePlates) everPlates.add(k);
-  const plates = `<div class="card"><h2>🚗 License plates, all-time</h2><p><b>${US_STATES.filter(s => everPlates.has(s)).length}</b> of 50 states seen${everPlates.has('DC') ? ' + DC' : ''} · <b>${[...everPlates].filter(k => k.startsWith('CA-')).length}</b> Canadian</p>
+  const plates = `<div class="card"><h2>🚗 License plates, all-time</h2><p><b>${US_STATES.filter(s => everPlates.has(s)).length}</b> of 50 states seen${everPlates.has('DC') ? ' + DC' : ''} · <b>${[...everPlates].filter(k => k.startsWith('CA-')).length}</b> Canadian · <b>${[...everPlates].filter(k => PLATES[k] && PLATES[k].country === 'X').length}</b> of ${Object.values(PLATES).filter(x => x.country === 'X').length} special</p>
     <p class="muted">Never seen yet: ${US_STATES.filter(s => !everPlates.has(s)).map(s => PLATES[s].name).join(', ') || 'nothing. You\'ve seen them all!'}</p></div>`;
 
   const win = (t, id) => t.end ? (t.winners[id].map(playerName).join(' & ') || '–') : '…';
@@ -417,14 +422,24 @@ function viewAwards() {
   if (!pids.length) return `<div class="card center"><p>Add players under Trips &amp; players first.</p></div>`;
   return pids.map(pid => {
     const l = state.life[pid];
+    const lv = levelFor(l.badges);
     const earned = AWARDS.filter(a => l.awards[a.id]).length;
-    return `<div class="card"><h2>${dot(pid)}${playerName(pid)} <span class="muted">${earned} of ${AWARDS.length}</span></h2><div class="awards">` +
-      AWARDS.map(a => {
+    const shown = AWARDS.filter(a => !a.hidden || l.awards[a.id]);
+    const secret = AWARDS.length - shown.length;
+    const when = w => { const trip = w.trip && state.trips[w.trip]; return `${fmtDate(w.ts)}${trip ? ' · ' + esc(trip.name) : ''}`; };
+    return `<div class="card"><h2>${dot(pid)}${playerName(pid)} <span class="muted">${earned} of ${AWARDS.length} awards</span></h2>
+      <div class="level"><span class="lvl">${lv.level}</span><div><b>Level ${lv.level} · ${lv.title}</b>
+        <div class="muted">${plural(l.badges, 'award', 'awards')} earned, repeats included. ${plural(lv.to - l.badges, 'more', 'more')} for level ${lv.level + 1}.</div>
+        <div class="bar"><div style="width:${Math.round(100 * (l.badges - lv.from) / (lv.to - lv.from))}%"></div></div></div></div>
+      <div class="awards">` +
+      shown.map(a => {
         const got = l.awards[a.id];
-        const trip = got && got.trip && state.trips[got.trip];
-        return `<div class="award${got ? ' got' : ''}"><div class="aicon">${a.icon}</div><div><b>${a.name}</b><div class="muted">${a.desc}</div>
-          ${got ? `<div class="when">${fmtDate(got.ts)}${trip ? ' · ' + esc(trip.name) : ''}</div>` : ''}</div></div>`;
-      }).join('') + `</div></div>`;
+        const times = got && got.count > 1 ? `<span class="times">×${got.count}</span>` : '';
+        return `<div class="award${got ? ' got' : ''}"><div class="aicon">${a.icon}</div><div><b>${a.name}</b>${times}<div class="muted">${a.desc}${a.repeat ? ' <span class="again">↻ every trip</span>' : ''}</div>
+          ${got ? `<div class="when">${got.count > 1 ? 'First ' + when(got) + '; last ' + when(got.last) : when(got)}</div>` : ''}</div></div>`;
+      }).join('') +
+      (secret ? `<div class="award secret"><div class="aicon">❔</div><div><b>${plural(secret, 'hidden award', 'hidden awards')}</b><div class="muted">Keep playing to find out. Zombies know a few.</div></div></div>` : '') +
+      `</div></div>`;
   }).join('');
 }
 

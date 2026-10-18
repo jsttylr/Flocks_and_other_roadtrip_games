@@ -51,7 +51,7 @@ Each panel's **↩ Undo** takes back that player's last tap in that game.
 
 ### 🚗 License plates (together)
 
-The whole car plays as one team. Tap a state or province the moment anyone sees it, and the tile shows when you found it. All 50 states, Washington DC and the Canadian provinces and territories are there. Tap a found plate to take it back.
+The whole car plays as one team. Tap a state or province the moment anyone sees it, and the tile shows when you found it. All 50 states, Washington DC, the Canadian provinces and territories, Mexico, Puerto Rico, diplomat plates and US Government plates are there. Tap a found plate to take it back.
 
 ![License plates, played together](docs/screenshots/plates.png)
 
@@ -69,7 +69,11 @@ When the iPad uses the home server's secure address (see [Setting up the iPad](#
 
 ![All-time stats](docs/screenshots/stats.png)
 
-**Awards** shows all 36 awards for each player, earned or not, with when and on which trip each was won. A pop-up announces each one the moment it's earned. Some favourites: *Grim Reaper*, *Heartbreak* (lose a flock of 100), *Hallelujah*, *Miracle* (a church brings back 100), *Comeback Kid*, *Zombie Zoo*, *Say It Twice*, *Rainbow Fleet*, *Coast to Coast* and *Fifty Club*.
+**Awards** shows each player's awards, earned or not, with when and on which trip each was won. A pop-up announces each one the moment it's earned. Some favourites: *Grim Reaper*, *Heartbreak* (lose a flock of 100), *Miracle* (a church brings back 100), *Comeback Kid*, *Triple Crown* (win all three games on one trip), *Say It Twice*, *Rainbow Fleet*, *Clean Sweep* (all 50 states on one trip) and *Fifty Club*.
+
+- **Every-trip awards** (marked ↻) can be won again on every trip, like winning Flocks or a Clean Sweep, and show how many times you've won them.
+- **Hidden awards** stay a mystery until someone earns one. Zombies spotted on certain days know a few of them.
+- **Levels:** every award you earn, repeats included, counts toward your level, like the badges on a fitness watch. Level 2 takes 1 award, level 3 takes 3, level 4 takes 6, and so on. Each level needs one more award than the last.
 
 ![Awards](docs/screenshots/awards.png)
 
