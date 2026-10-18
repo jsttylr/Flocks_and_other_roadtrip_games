@@ -1,6 +1,10 @@
 // The rules of the games, and how scores, stats and awards are worked out from
 // the list of events. Nothing in here touches the page, so it can be tested.
 
+// The page's version. It must match appVersion in main.go (a Go test checks),
+// so a page left over on the iPad can tell the server has a newer one.
+const PAGE_VERSION = '0.4.1';
+
 // Flocks: live animals. A cemetery kills flocks; a church brings yours back.
 // Deer count too, but they aren't farm animals, so Old MacDonald doesn't need them.
 const ANIMALS = [
@@ -1017,4 +1021,4 @@ function lastUndoable(events, st, tripId, playerId, game) {
   return best;
 }
 
-if (typeof module !== 'undefined') module.exports = { FARM_ANIMALS, CROPS, VOLVO_OTHERS, GRID, GOLD_PRICE, MONASTERY_BONUS, WAGE_KM, DRIVE_RANKS, driveRank, kmBetween, farmRegions, ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, REALM_RANKS, realmRank, EXPLORE_RANKS, exploreRank, exploreScore, hexKm, realmCurrent, realmMayPlay, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };
+if (typeof module !== 'undefined') module.exports = { PAGE_VERSION, FARM_ANIMALS, CROPS, VOLVO_OTHERS, GRID, GOLD_PRICE, MONASTERY_BONUS, WAGE_KM, DRIVE_RANKS, driveRank, kmBetween, farmRegions, ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, REALM_RANKS, realmRank, EXPLORE_RANKS, exploreRank, exploreScore, hexKm, realmCurrent, realmMayPlay, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };
