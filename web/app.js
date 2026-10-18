@@ -369,6 +369,8 @@ const DIRS = ['east', 'north-east', 'north-west', 'west', 'south-west', 'south-e
 const purseOf = pid => state.realm.purse[pid] || {};
 const costText = cost => Object.entries(cost).map(([k, n]) => `${n}${RESOURCES.find(r => r.id === k).icon}`).join(' ');
 function realmPlayer() {
+  const now = realmCurrent(state.realm);
+  if (now) return now;
   const pids = visiblePlayers();
   if (!pids.includes(db.realmPlayer)) db.realmPlayer = pids[0];
   return db.realmPlayer;
@@ -382,14 +384,17 @@ function viewRealm() {
     const p = purseOf(pid);
     return `<tr class="${pid === me ? 'me' : ''}"><td>${dot(pid)}${playerName(pid)}</td><td class="pts">${r.points[pid] || 0}</td>
       ${RESOURCES.map(x => `<td>${p[x.id] || 0}</td>`).join('')}
-      <td>${r.land[pid] || 0}${r.biggest === pid ? ' 👑' : ''}</td><td>${r.roadLength[pid] || 0}${r.longest === pid ? ' 👑' : ''}</td></tr>`;
+      <td>${r.land[pid] || 0}${r.biggest === pid ? ' 👑' : ''}</td><td>${r.roadLength[pid] || 0}${r.longest === pid ? ' 👑' : ''}</td><td class="rank">${realmRank(r.points[pid] || 0).title}</td></tr>`;
   }).join('');
   return `<div class="card realm-head">
       <h2>🏰 The Realm</h2>
       <p class="muted">Every sighting with a location claims a hex of the real map. Hexes go to whoever has spotted the most there. When a trip ends, everyone gets paid in resources to build with.</p>
-      <div class="who">${pids.map(pid => `<button class="${pid === me ? 'on' : ''}" style="--pc:${state.players[pid].color}" data-act="realm-who" data-player="${pid}">${playerName(pid)}</button>`).join('')}</div>
-      <div class="scroll"><table class="stats realm"><thead><tr><th></th><th>Points</th>${RESOURCES.map(x => `<th title="${x.name}">${x.icon}</th>`).join('')}<th>Land</th><th>Road</th></tr></thead><tbody>${board}</tbody></table></div>
-      <div class="row"><button data-act="realm-trade">🤝 Trade</button><button data-act="realm-bank">🏦 Bank ${BANK_RATE} for 1</button><button class="ghost" data-act="undo" data-game="realm" data-player="${me}">↩ Undo</button><button class="ghost" data-act="realm-rules">❓ How to play</button></div>
+      ${r.turn ? `<div class="turn" style="--pc:${state.players[me].color}"><div><b>${playerName(me)}'s turn</b> <span class="muted">round ${r.turn.round} · next up ${playerName(r.turn.order[(r.turn.i + 1) % r.turn.order.length])}</span>
+          <div class="muted">Build, trade or both, then pass the iPad on. Order: ${r.turn.order.map(playerName).join(' → ')}</div></div>
+          <button class="primary" data-act="realm-pass" data-player="${me}">✅ End turn</button></div>`
+        : `<div class="who">${pids.map(pid => `<button class="${pid === me ? 'on' : ''}" style="--pc:${state.players[pid].color}" data-act="realm-who" data-player="${pid}">${playerName(pid)}</button>`).join('')}</div>`}
+      <div class="scroll"><table class="stats realm"><thead><tr><th></th><th>Points</th>${RESOURCES.map(x => `<th title="${x.name}">${x.icon}</th>`).join('')}<th>Land</th><th>Road</th><th>Rank</th></tr></thead><tbody>${board}</tbody></table></div>
+      <div class="row"><button data-act="realm-trade">🤝 Trade</button><button data-act="realm-bank">🏦 Bank ${BANK_RATE} for 1</button><button class="ghost" data-act="undo" data-game="realm" data-player="">↩ Undo</button><button class="ghost" data-act="realm-rules">❓ How to play</button></div>
     </div>
     ${hexes ? `<p class="muted center">Tap a hex to build as <b>${playerName(me)}</b>.</p><div id="realm-map" class="map realm-map"></div>` :
       `<div class="card center"><p>The board is empty. Sightings made on the secure address (with GPS) claim hexes on the map.</p></div>`}`;
@@ -478,7 +483,9 @@ function realmRulesSheet() {
       <li><b>Cemeteries are the robber.</b> Whoever calls a cemetery takes one resource from each flock they killed when the trip's pay comes in.</li>
       <li><b>Build.</b> ${Object.values(BUILDINGS).map(b => `${b.icon} ${b.name}: ${costText(b.cost)}`).join(' · ')}. Settle a hex you hold or one your road reaches. Roads run between neighbouring hexes from your settlements and roads.</li>
       <li><b>Harvest.</b> After every trip that passes through a settled hex, its owner gets 1 of that hex's resource (2 for a city).</li>
-      <li><b>Trade.</b> Swap with each other any time, or with the bank at ${BANK_RATE} for 1.</li>
+      <li><b>Take turns.</b> After every trip a new round starts, and whoever did worst on the trip goes first. On your turn, build and trade as much as you can afford, then tap <b>End turn</b> and pass the iPad. Rounds keep going until the next trip.</li>
+      <li><b>Trade.</b> On your turn, swap with anyone who agrees, or with the bank at ${BANK_RATE} for 1.</li>
+      <li><b>Ranks.</b> ${REALM_RANKS.map(([n, t]) => `${t} ${n}`).join(' · ')} Realm points. Realm awards count toward your level like every other award.</li>
       <li><b>Points.</b> Settlement 1, city 2. Longest Road (at least ${LONGEST_ROAD_MIN} in a row) and Biggest Territory (at least ${BIGGEST_LAND_MIN} hexes) are worth 2 each.</li>
     </ul>
     <div class="row"><button class="ghost" data-act="close">Got it</button></div>`);
@@ -948,6 +955,12 @@ function onClick(ev) {
       break;
     case 'trip-certs': tripCertsSheet(d.trip); break;
     case 'realm-who': db.realmPlayer = d.player; save(); render(); break;
+    case 'realm-pass': {
+      record('realm.pass', { player: d.player });
+      const next = realmCurrent(state.realm);
+      if (next) toast(`🎲 ${playerName(next)}'s turn!`, true);
+      break;
+    }
     case 'realm-rules': realmRulesSheet(); break;
     case 'realm-trade': realmTradeSheet(); break;
     case 'realm-bank': realmBankSheet(); break;

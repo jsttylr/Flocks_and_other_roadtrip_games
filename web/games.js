@@ -147,7 +147,20 @@ const AWARDS = [
   { id: 'homesteader', game: 'realm', icon: '🏠', name: 'Homesteader', desc: 'Build your first settlement in the Realm', check: c => c.e.type === 'realm.build' && c.e.data.kind === 'settlement' },
   { id: 'city_slicker', game: 'realm', icon: '🏙️', name: 'City Slicker', desc: 'Grow a settlement into a city', check: c => c.e.type === 'realm.build' && c.e.data.kind === 'city' },
   { id: 'long_haul', game: 'realm', icon: '🛤️', name: 'Long Haul', desc: 'Hold the Longest Road in the Realm', check: c => c.realm && c.realm.longest === c.pid },
-  { id: 'land_baron', game: 'realm', icon: '🗺️', name: 'Land Baron', desc: 'Hold Biggest Territory in the Realm', check: c => c.realm && c.realm.biggest === c.pid },
+  { id: 'land_baron', game: 'realm', icon: '🏞️', name: 'Land Baron', desc: 'Hold Biggest Territory in the Realm', check: c => c.realm && c.realm.biggest === c.pid },
+  { id: 'trailhead', game: 'realm', icon: '🚧', name: 'Trailhead', desc: 'Build your first road', check: c => c.life.realm.roads >= 1 },
+  { id: 'road_crew', game: 'realm', icon: '🦺', name: 'Road Crew', desc: 'Build 10 roads', check: c => c.life.realm.roads >= 10 },
+  { id: 'township', game: 'realm', icon: '🏘️', name: 'Township', desc: 'Build 3 settlements', check: c => c.life.realm.settlements >= 3 },
+  { id: 'metropolis', game: 'realm', icon: '🌆', name: 'Metropolis', desc: 'Grow 3 cities', check: c => c.life.realm.cities >= 3 },
+  { id: 'handshake', game: 'realm', icon: '🤝', name: 'Handshake', desc: 'Make your first trade with another player', check: c => c.life.realm.trades >= 1 },
+  { id: 'wheeler_dealer', game: 'realm', icon: '💱', name: 'Wheeler Dealer', desc: 'Make 10 trades with other players', check: c => c.life.realm.trades >= 10 },
+  { id: 'banker', game: 'realm', icon: '🏦', name: 'Money Talks', desc: 'Trade with the bank', check: c => c.life.realm.bank >= 1 },
+  { id: 'robber_baron', game: 'realm', icon: '🦹', name: 'Robber Baron', desc: 'Steal 10 resources with cemeteries', check: c => c.life.realm.stolen >= 10 },
+  { id: 'harvest_home', game: 'realm', icon: '🧺', name: 'Harvest Home', desc: 'Collect a harvest from your settlement', check: c => c.life.realm.harvested >= 1 },
+  { id: 'treasure', game: 'realm', icon: '💰', name: 'Treasure Chest', desc: 'Hold 5 of every resource at once', check: c => c.realm && c.realm.purse[c.pid] && RESOURCES.every(r => c.realm.purse[c.pid][r.id] >= 5) },
+  { id: 'knighted', game: 'realm', icon: '🛡️', name: 'Knighted', desc: 'Reach the rank of Knight (3 Realm points)', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 3 },
+  { id: 'duke', game: 'realm', icon: '🎩', name: 'Your Grace', desc: 'Reach the rank of Duke (15 Realm points)', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 15 },
+  { id: 'monarch', game: 'realm', icon: '🫅', name: 'Long Live the Monarch', desc: 'Reach 21 Realm points', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 21 },
   { id: 'buckle_up', game: 'trips', icon: '🚙', name: 'Buckle Up', desc: 'Play your first trip', check: c => c.life.trips >= 1 },
   { id: 'road_warrior', game: 'trips', icon: '🛣️', name: 'Road Warrior', desc: 'Play on 10 trips', check: c => c.life.trips >= 10 },
   { id: 'globetrotter', game: 'trips', icon: '🧳', name: 'Globetrotter', desc: 'Play on 25 trips', check: c => c.life.trips >= 25 },
@@ -177,6 +190,7 @@ function emptyLife() {
     kills: 0, deaths: 0, lost: 0, biggestLoss: 0, churches: 0, raised: 0, biggestRaise: 0,
     zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0,
     uniquePlates: new Set(), awards: {}, badges: 0,
+    realm: { roads: 0, settlements: 0, cities: 0, trades: 0, bank: 0, stolen: 0, harvested: 0, turns: 0 },
   };
 }
 
@@ -325,7 +339,7 @@ function buildState(events, seenIds) {
           for (const r of RESOURCES) got[r.id] = Math.floor(seen[r.id] / EARN_EVERY[r.id]) + 1;
           for (const key of trip.hexHits) {
             const b = realm.hexes[key].building, t = realm.hexes[key].terrain;
-            if (b && b.player === pid && t) got[t] += b.kind === 'city' ? 2 : 1;
+            if (b && b.player === pid && t) { const n = b.kind === 'city' ? 2 : 1; got[t] += n; life(pid).realm.harvested += n; }
           }
           pay(purse(pid), got, 1);
           trip.paid[pid] = got;
@@ -334,10 +348,17 @@ function buildState(events, seenIds) {
         for (const { thief, victims } of trip.steals) {
           for (const v of victims) {
             const vp = purse(v), top = RESOURCES.map(r => r.id).reduce((a, b) => vp[b] > vp[a] ? b : a);
-            if (vp[top] > 0) { vp[top]--; purse(thief)[top]++; }
+            if (vp[top] > 0) { vp[top]--; purse(thief)[top]++; life(thief).realm.stolen++; }
           }
         }
         realmScore();
+        // Turns in the Realm start over after every trip. Whoever did worst on
+        // the trip goes first, which helps the youngest catch up.
+        if (trip.players.length) {
+          const place = pid => CONTESTS.reduce((n, c) => n + trip.players.filter(q => c.score(trip.by[q]) > c.score(trip.by[pid])).length, 0);
+          const order = [...trip.players].sort((a, b) => place(b) - place(a));
+          realm.turn = { order, i: 0, round: 1, trip: trip.id };
+        }
         for (const pid of trip.players) {
           life(pid).bestFlock = Math.max(life(pid).bestFlock, trip.by[pid].score);
           award(pid, { trip, tp: trip.by[pid], won: won[pid] || [] }, e);
@@ -459,7 +480,7 @@ function buildState(events, seenIds) {
       }
       case 'realm.build': {
         const pid = d.player, kind = d.kind, b = BUILDINGS[kind];
-        if (!st.players[pid] || !b || !canPay(purse(pid), b.cost)) break;
+        if (!st.players[pid] || !b || !realmMayPlay(realm, pid) || !canPay(purse(pid), b.cost)) break;
         if (kind === 'road') {
           if (!canRoad(realm, pid, d.hex, d.to)) break;
           realm.roads[roadKey(d.hex, d.to)] = { player: pid, ts: e.ts };
@@ -472,20 +493,33 @@ function buildState(events, seenIds) {
           h.building = { player: pid, kind, ts: e.ts };
         }
         pay(purse(pid), b.cost);
+        life(pid).realm[kind === 'road' ? 'roads' : kind === 'settlement' ? 'settlements' : 'cities']++;
         realmScore();
-        award(pid, {}, e);
+        for (const p of st.playerOrder) award(p, {}, e);
         break;
       }
       // Two players swap resources, or one swaps 4 of a kind with the bank for 1 of another.
       case 'realm.trade': {
         const give = cleanBundle(d.give), get = cleanBundle(d.get);
-        if (!st.players[d.player] || !Object.keys(give).length || !Object.keys(get).length) break;
+        if (!st.players[d.player] || !realmMayPlay(realm, d.player) || !Object.keys(give).length || !Object.keys(get).length) break;
         if (d.with === 'bank') {
           const [gk, gn] = Object.entries(give)[0], [wk, wn] = Object.entries(get)[0];
           if (Object.keys(give).length !== 1 || Object.keys(get).length !== 1 || gk === wk || gn !== BANK_RATE * wn || !canPay(purse(d.player), give)) break;
         } else if (!st.players[d.with] || d.with === d.player || !canPay(purse(d.player), give) || !canPay(purse(d.with), get)) break;
         pay(purse(d.player), give); pay(purse(d.player), get, 1);
-        if (d.with !== 'bank') { pay(purse(d.with), get); pay(purse(d.with), give, 1); }
+        if (d.with !== 'bank') { pay(purse(d.with), get); pay(purse(d.with), give, 1); life(d.player).realm.trades++; life(d.with).realm.trades++; award(d.with, {}, e); }
+        else life(d.player).realm.bank++;
+        award(d.player, {}, e);
+        break;
+      }
+      // The player whose turn it is hands the dice on.
+      case 'realm.pass': {
+        const t = realm.turn;
+        if (!t || realmCurrent(realm) !== d.player) break;
+        life(d.player).realm.turns++;
+        t.i++;
+        if (t.i >= t.order.length) { t.i = 0; t.round++; }
+        award(d.player, {}, e);
         break;
       }
     }
@@ -565,7 +599,18 @@ function cleanBundle(b) {
   return out;
 }
 
-function emptyRealm() { return { hexes: {}, roads: {}, purse: {}, points: {}, roadLength: {}, land: {}, longest: null, biggest: null }; }
+function emptyRealm() { return { hexes: {}, roads: {}, purse: {}, points: {}, roadLength: {}, land: {}, longest: null, biggest: null, turn: null }; }
+
+// Ranks in the Realm go by Realm points.
+const REALM_RANKS = [[0, 'Wanderer'], [1, 'Squire'], [3, 'Knight'], [6, 'Baron'], [10, 'Count'], [15, 'Duke'], [21, 'Monarch']];
+function realmRank(points) {
+  let i = 0;
+  while (i + 1 < REALM_RANKS.length && points >= REALM_RANKS[i + 1][0]) i++;
+  return { title: REALM_RANKS[i][1], next: REALM_RANKS[i + 1] ? { points: REALM_RANKS[i + 1][0], title: REALM_RANKS[i + 1][1] } : null };
+}
+// Whose turn it is, if turns have started; null means anyone may play.
+const realmCurrent = realm => realm.turn ? realm.turn.order[realm.turn.i] : null;
+const realmMayPlay = (realm, pid) => !realm.turn || realmCurrent(realm) === pid;
 
 // The longest chain of one player's roads, counted in roads, without using a road twice.
 function longestRoad(roads, pid) {
@@ -650,7 +695,7 @@ const UNDO_KINDS = {
   flocks: ['flock.add', 'flock.cemetery', 'flock.church', 'flock.wipe'],
   zombies: ['zombie.add'],
   volvos: ['volvo.add'],
-  realm: ['realm.build', 'realm.trade'],
+  realm: ['realm.build', 'realm.trade', 'realm.pass'],
 };
 function lastUndoable(events, st, tripId, playerId, game) {
   const kinds = new Set(UNDO_KINDS[game] || Object.values(UNDO_KINDS).flat());
@@ -663,4 +708,4 @@ function lastUndoable(events, st, tripId, playerId, game) {
   return best;
 }
 
-if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };
+if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, REALM_RANKS, realmRank, realmCurrent, realmMayPlay, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };

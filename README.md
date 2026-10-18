@@ -72,8 +72,9 @@ The game you play after the trip, a bit like Settlers of Catan. Every sighting w
 - **Payday:** when a trip ends, everyone is paid in resources: 🐑 wool for flocks, 🧱 bricks for zombies, ⛏️ ore for Volvo points, 🌾 grain for plates and 🪵 lumber for cemeteries and churches, plus one of each for coming along.
 - **The robber:** whoever calls a cemetery takes one resource from each flock they killed.
 - **Build:** roads (🧱🪵), settlements (🧱🪵🐑🌾) and cities (🌾🌾⛏️⛏️⛏️). Settle a hex you hold or one your road reaches, and every later trip through it harvests that hex's resource.
-- **Trade:** swap with each other, or 4 for 1 with the bank.
-- **Points:** settlement 1, city 2, plus 2 each for **Longest Road** and **Biggest Territory**.
+- **Turns:** after every trip a new round starts, with whoever did worst on the trip going first. On your turn, build and trade, then tap **End turn** and pass the iPad. Rounds keep going until the next trip.
+- **Trade:** on your turn, swap with anyone who agrees, or 4 for 1 with the bank.
+- **Points:** settlement 1, city 2, plus 2 each for **Longest Road** and **Biggest Territory**. Points earn ranks, from Wanderer through Squire, Knight, Baron, Count and Duke to Monarch, and 17 Realm awards count toward your level like every other award.
 
 Open **🏰 Realm**, pick whose turn it is, and tap a hex to build. **❓ How to play** has the full rules.
 
