@@ -153,8 +153,24 @@ function syncSoon() {
 async function loadStatus() {
   try {
     const r = await fetch('api/status', { cache: 'no-store' });
-    if (r.ok) { status = await r.json(); if (db.tab === 'setup') render(); }
+    if (r.ok) { status = await r.json(); freshen(); if (db.tab === 'setup') render(); }
   } catch (_) { /* not home */ }
+}
+
+// If home has a newer version than this page, throw away the iPad's saved
+// copy of the page and load the new one. Once per visit, so a mismatch can't
+// loop. Games aren't touched: they're kept separately from the page's copy.
+async function freshen() {
+  if (!status || !status.version || status.version === PAGE_VERSION) return;
+  try {
+    if (sessionStorage.getItem('roadtrip.freshen') === status.version) return;
+    sessionStorage.setItem('roadtrip.freshen', status.version);
+  } catch (_) { return; }
+  try {
+    if (navigator.serviceWorker) for (const reg of await navigator.serviceWorker.getRegistrations()) await reg.unregister();
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+  } catch (_) { /* best effort */ }
+  location.reload();
 }
 
 // ---------- Helpers ----------
@@ -846,7 +862,9 @@ function viewSetup() {
     return `<div class="prow${p.hidden ? ' hidden' : ''}">${dot(pid)}<span class="grow">${esc(p.name)}</span>
       <button class="ghost" data-act="edit-player" data-player="${pid}">Change</button></div>`;
   }).join('') + `</div><button data-act="add-player">+ Add a player</button></div>`;
+  const ver = status && status.version && status.version !== PAGE_VERSION ? ` Home has version ${esc(status.version)}; this page will update itself.` : '';
   const saving = `<div class="card"><h2>Saving</h2><p>${syncDetail()}</p>
+    <p class="muted">This page is version ${PAGE_VERSION}.${ver}</p>
     <p class="muted">Everything is kept on this iPad as you play, so a dead zone never loses anything. Whenever the iPad can reach home (home Wi-Fi, or WireGuard over cell) it sends what it has and picks up what any other device recorded.</p>
     <div class="row"><button data-act="sync">Save at home now</button><a class="button ghost" href="api/backup">Download a backup</a></div></div>`;
   const certs = `<div class="card"><h2>🎓 Certificates</h2>

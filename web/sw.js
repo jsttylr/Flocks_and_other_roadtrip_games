@@ -1,6 +1,6 @@
 // Keeps a copy of the page on the tablet so it opens with no signal.
 // Only used when the page is reached over https (browsers' rule).
-const CACHE = 'roadtrip-v8';
+const CACHE = 'roadtrip-v9';
 const FILES = ['./', 'index.html', 'style.css', 'games.js', 'app.js', 'icon.svg', 'manifest.json', 'vendor/leaflet.js', 'vendor/leaflet.css'];
 
 self.addEventListener('install', e => {
@@ -17,7 +17,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.includes('/api/')) return;
-  e.respondWith(fetch(e.request).then(r => {
+  // no-store skips the browser's own cache too, so an update always gets through.
+  e.respondWith(fetch(e.request, { cache: 'no-store' }).then(r => {
     const copy = r.clone();
     caches.open(CACHE).then(c => c.put(e.request, copy));
     return r;
