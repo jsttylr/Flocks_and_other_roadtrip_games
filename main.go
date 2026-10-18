@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
@@ -15,13 +16,16 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata" // so TZ works in the tiny Docker image, which has no time zone files
 )
 
-var appVersion = "0.1.0"
+var appVersion = "0.2.0"
 
 func main() {
 	dir := flag.String("data", dataDir(), "folder for the game history")
 	port := flag.Int("port", envInt("ROADTRIP_PORT", 8070), "web page port")
+	httpsPort := flag.Int("https-port", envInt("ROADTRIP_HTTPS_PORT", 8443), "secure web page port (0 to turn it off)")
+	hosts := flag.String("hosts", os.Getenv("ROADTRIP_HOSTS"), "extra names or addresses for the secure address, comma separated")
 	noBrowser := flag.Bool("no-browser", false, "don't open the page in a browser on start")
 	flag.Parse()
 
@@ -45,12 +49,31 @@ func main() {
 		fatal("Roadtrip Games can't open its web page on port %d:\n%v", *port, err)
 	}
 	app := &App{store: store, port: *port}
+	var secure *http.Server
+	if *httpsPort > 0 {
+		certs, cert, err := LoadCerts(*dir, certHosts(*hosts))
+		if err != nil {
+			log.Printf("no secure address: %v", err)
+		} else if sln, err := net.Listen("tcp", fmt.Sprintf(":%d", *httpsPort)); err != nil {
+			log.Printf("no secure address: can't open port %d: %v", *httpsPort, err)
+		} else {
+			app.certs, app.httpsPort = certs, *httpsPort
+			secure = &http.Server{Handler: app.handler(), ReadHeaderTimeout: 10 * time.Second,
+				TLSConfig: &tls.Config{Certificates: []tls.Certificate{*cert}}}
+			go secure.ServeTLS(sln, "", "")
+		}
+	}
 	srv := &http.Server{Handler: app.handler(), ReadHeaderTimeout: 10 * time.Second}
 	go srv.Serve(ln)
 
 	fmt.Printf("\nRoadtrip Games: %s\n", url)
 	for _, a := range lanAddresses(*port) {
 		fmt.Printf("On the tablet:  %s\n", a)
+	}
+	if app.certs != nil {
+		for _, a := range describeHosts(app.certs.hosts, app.httpsPort) {
+			fmt.Printf("Secure (GPS):   %s\n", a)
+		}
 	}
 	fmt.Printf("Leave this running. Press Ctrl+C to stop.\n\n")
 	if !*noBrowser {
@@ -62,6 +85,9 @@ func main() {
 	<-sig
 	log.Print("stopping")
 	srv.Close()
+	if secure != nil {
+		secure.Close()
+	}
 	store.Close()
 }
 

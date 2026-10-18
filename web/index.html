@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+<script>try { const t = JSON.parse(localStorage.getItem("roadtrip.v1") || "{}").theme; if (t) document.documentElement.dataset.theme = t; } catch (_) {}</script>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -10,17 +11,21 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
   <div class="brand">🚙 Roadtrip Games <span id="trip-name" class="trip"></span></div>
-  <div id="sync" class="sync"></div>
+  <div id="mode" class="mode"></div>
+  <button id="theme" class="theme" data-act="theme"></button>
+  <div class="badges"><span id="gps" class="sync off"></span><span id="sync" class="sync"></span></div>
 </header>
 <nav id="tabs" class="tabs"></nav>
 <main id="main"></main>
 <div id="sheet" class="sheet"><div class="sheet-card"><button class="x" data-act="close" aria-label="Close">✕</button><div id="sheet-body"></div></div></div>
 <div id="toast" class="toast"></div>
+<script src="vendor/leaflet.js"></script>
 <script src="games.js"></script>
 <script src="app.js"></script>
 </body>
