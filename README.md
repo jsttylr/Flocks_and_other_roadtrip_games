@@ -16,6 +16,7 @@ It's one small program that runs at home on a Windows PC, a Mac, a Raspberry Pi 
 
 - [The games](#the-games)
 - [Trip map](#trip-map)
+- [The Realm](#the-realm)
 - [Stats and awards](#stats-and-awards)
 - [Printable certificates](#printable-certificates)
 - [Night mode](#night-mode)
@@ -63,6 +64,20 @@ When the iPad uses the home server's secure address (see [Setting up the iPad](#
 ![Trip map](docs/screenshots/map.png)
 
 *(The street map is left out of this screenshot; in the app the pins sit on an OpenStreetMap map.)*
+
+## The Realm
+
+The game you play after the trip, a bit like Settlers of Catan. Every sighting with a location lands on a hex about 20 km across, laid over the real map. Whoever has spotted the most in a hex holds that territory, and the board grows with every trip you take.
+
+- **Payday:** when a trip ends, everyone is paid in resources: 🐑 wool for flocks, 🧱 bricks for zombies, ⛏️ ore for Volvo points, 🌾 grain for plates and 🪵 lumber for cemeteries and churches, plus one of each for coming along.
+- **The robber:** whoever calls a cemetery takes one resource from each flock they killed.
+- **Build:** roads (🧱🪵), settlements (🧱🪵🐑🌾) and cities (🌾🌾⛏️⛏️⛏️). Settle a hex you hold or one your road reaches, and every later trip through it harvests that hex's resource.
+- **Trade:** swap with each other, or 4 for 1 with the bank.
+- **Points:** settlement 1, city 2, plus 2 each for **Longest Road** and **Biggest Territory**.
+
+Open **🏰 Realm**, pick whose turn it is, and tap a hex to build. **❓ How to play** has the full rules.
+
+![The Realm: territory, roads and settlements on the trip map](docs/screenshots/realm.png)
 
 ## Stats and awards
 

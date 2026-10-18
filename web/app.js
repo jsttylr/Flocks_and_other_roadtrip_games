@@ -187,7 +187,7 @@ const MODE_TABS = {
   compete: [['flocks', '🐄 Flocks'], ['zombies', '🧟 Zombies'], ['volvos', '🚚 Volvos']],
   together: [['plates', '🚗 License plates']],
 };
-const COMMON_TABS = [['map', '🗺️ Map'], ['stats', '📊 Stats'], ['awards', '🏅 Awards'], ['setup', '⚙️ Trips & players']];
+const COMMON_TABS = [['map', '🗺️ Map'], ['realm', '🏰 Realm'], ['stats', '📊 Stats'], ['awards', '🏅 Awards'], ['setup', '⚙️ Trips & players']];
 
 function render() {
   const tabs = [...MODE_TABS[db.mode], ...COMMON_TABS];
@@ -197,10 +197,11 @@ function render() {
   $('#tabs').innerHTML = tabs.map(([id, label]) => `<button class="tab${db.tab === id ? ' on' : ''}" data-tab="${id}">${label}</button>`).join('');
   const t = state.activeTrip;
   $('#trip-name').textContent = t ? t.name : 'No trip going';
-  const view = { flocks: viewFlocks, zombies: viewZombies, volvos: viewVolvos, plates: viewPlates, map: viewMap, stats: viewStats, awards: viewAwards, setup: viewSetup }[db.tab];
+  const view = { flocks: viewFlocks, zombies: viewZombies, volvos: viewVolvos, plates: viewPlates, map: viewMap, stats: viewStats, awards: viewAwards, setup: viewSetup, realm: viewRealm }[db.tab];
   dropMap();
   $('#main').innerHTML = view();
   if (db.tab === 'map') drawMap();
+  if (db.tab === 'realm') drawRealm();
   renderSync();
 }
 
@@ -361,6 +362,128 @@ function drawMap() {
   });
 }
 
+// ---------- The Realm ----------
+// The after-the-trip game: claim the map, trade, and build. The rules live in games.js.
+
+const DIRS = ['east', 'north-east', 'north-west', 'west', 'south-west', 'south-east'];
+const purseOf = pid => state.realm.purse[pid] || {};
+const costText = cost => Object.entries(cost).map(([k, n]) => `${n}${RESOURCES.find(r => r.id === k).icon}`).join(' ');
+function realmPlayer() {
+  const pids = visiblePlayers();
+  if (!pids.includes(db.realmPlayer)) db.realmPlayer = pids[0];
+  return db.realmPlayer;
+}
+
+function viewRealm() {
+  const pids = visiblePlayers();
+  if (!pids.length) return `<div class="card center"><p>Add players under Trips &amp; players first.</p></div>`;
+  const r = state.realm, me = realmPlayer(), hexes = Object.keys(r.hexes).length;
+  const board = pids.map(pid => {
+    const p = purseOf(pid);
+    return `<tr class="${pid === me ? 'me' : ''}"><td>${dot(pid)}${playerName(pid)}</td><td class="pts">${r.points[pid] || 0}</td>
+      ${RESOURCES.map(x => `<td>${p[x.id] || 0}</td>`).join('')}
+      <td>${r.land[pid] || 0}${r.biggest === pid ? ' 👑' : ''}</td><td>${r.roadLength[pid] || 0}${r.longest === pid ? ' 👑' : ''}</td></tr>`;
+  }).join('');
+  return `<div class="card realm-head">
+      <h2>🏰 The Realm</h2>
+      <p class="muted">Every sighting with a location claims a hex of the real map. Hexes go to whoever has spotted the most there. When a trip ends, everyone gets paid in resources to build with.</p>
+      <div class="who">${pids.map(pid => `<button class="${pid === me ? 'on' : ''}" style="--pc:${state.players[pid].color}" data-act="realm-who" data-player="${pid}">${playerName(pid)}</button>`).join('')}</div>
+      <div class="scroll"><table class="stats realm"><thead><tr><th></th><th>Points</th>${RESOURCES.map(x => `<th title="${x.name}">${x.icon}</th>`).join('')}<th>Land</th><th>Road</th></tr></thead><tbody>${board}</tbody></table></div>
+      <div class="row"><button data-act="realm-trade">🤝 Trade</button><button data-act="realm-bank">🏦 Bank ${BANK_RATE} for 1</button><button class="ghost" data-act="undo" data-game="realm" data-player="${me}">↩ Undo</button><button class="ghost" data-act="realm-rules">❓ How to play</button></div>
+    </div>
+    ${hexes ? `<p class="muted center">Tap a hex to build as <b>${playerName(me)}</b>.</p><div id="realm-map" class="map realm-map"></div>` :
+      `<div class="card center"><p>The board is empty. Sightings made on the secure address (with GPS) claim hexes on the map.</p></div>`}`;
+}
+
+function drawRealm() {
+  const el = $('#realm-map');
+  if (!el || typeof L === 'undefined') return;
+  const r = state.realm;
+  map = L.map(el);
+  map.tripId = 'realm';
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
+  const all = [];
+  for (const [key, h] of Object.entries(r.hexes)) {
+    const g = hexCorners(key), owner = h.owner && state.players[h.owner];
+    all.push(...g.corners);
+    L.polygon(g.corners, { color: owner ? owner.color : '#777', weight: 2, fillColor: owner ? owner.color : '#999', fillOpacity: owner ? 0.35 : 0.12 })
+      .addTo(map).on('click', () => realmHexSheet(key));
+    const b = h.building && state.players[h.building.player];
+    const label = b ? `<span class="rb" style="background:${b.color}">${BUILDINGS[h.building.kind].icon}</span>` : `<span class="rt">${h.terrain ? TERRAIN[h.terrain].split(' ')[0] : ''}</span>`;
+    L.marker(g.center, { icon: L.divIcon({ className: 'hexlabel', html: label, iconSize: [36, 36], iconAnchor: [18, 18] }) }).addTo(map).on('click', () => realmHexSheet(key));
+  }
+  for (const [k, road] of Object.entries(r.roads)) {
+    const [a, b] = k.split('|'), p = state.players[road.player];
+    L.polyline([hexCorners(a).center, hexCorners(b).center], { color: p ? p.color : '#333', weight: 7, opacity: 0.9, lineCap: 'round' }).addTo(map);
+  }
+  if (mapView && mapView.trip === 'realm') map.setView(mapView.c, mapView.z);
+  else map.fitBounds(all, { padding: [30, 30], maxZoom: 10 });
+  const m = map;
+  requestAnimationFrame(() => { if (m === map) m.invalidateSize(); });
+}
+
+function realmHexSheet(key) {
+  const r = state.realm, h = r.hexes[key], me = realmPlayer(), purse = purseOf(me);
+  const owner = h.owner ? playerName(h.owner) : 'nobody yet';
+  const counts = Object.entries(h.counts).sort((a, b) => b[1] - a[1]).map(([p, n]) => `${playerName(p)} ${n}`).join(', ') || 'none by a player';
+  const opts = [];
+  const btn = (label, cost, data) => {
+    const ok = canPay(purse, cost);
+    opts.push(`<button class="${ok ? 'primary' : ''}" ${ok ? '' : 'disabled'} data-act="realm-build" ${data}>${label} <span class="cost">${costText(cost)}</span></button>`);
+  };
+  if (!h.building && canSettle(r, me, key)) btn('🏠 Build a settlement', BUILDINGS.settlement.cost, `data-kind="settlement" data-hex="${key}"`);
+  if (h.building && h.building.player === me && h.building.kind === 'settlement') btn('🏰 Grow into a city', BUILDINGS.city.cost, `data-kind="city" data-hex="${key}"`);
+  hexNeighbors(key).forEach((n, i) => { if (canRoad(r, me, key, n)) btn(`🛣️ Road ${DIRS[i]}`, BUILDINGS.road.cost, `data-kind="road" data-hex="${key}" data-to="${n}"`); });
+  const b = h.building;
+  sheet(`<h2>${h.terrain ? TERRAIN[h.terrain] : 'Open country'}</h2>
+    <p>Held by <b>${owner}</b>. Sightings here: ${counts}.</p>
+    ${b ? `<p>${BUILDINGS[b.kind].icon} ${playerName(b.player)}'s ${BUILDINGS[b.kind].name.toLowerCase()}, built ${fmtDate(b.ts)}. It harvests ${b.kind === 'city' ? 2 : 1} ${h.terrain ? RESOURCES.find(x => x.id === h.terrain).icon : ''} after every trip that drives through here.</p>` : ''}
+    <h3>${dot(me)}${playerName(me)} can</h3>
+    ${opts.length ? `<div class="stack">${opts.join('')}</div>` : `<p class="muted">Nothing to build here yet. Settle hexes you hold, or ones your roads reach. Roads run from your settlements and roads.</p>`}
+    <p class="muted">You have ${RESOURCES.map(x => `${purse[x.id] || 0}${x.icon}`).join(' ')}</p>`);
+}
+
+function bundleRows(prefix) {
+  return RESOURCES.map(x => `<label class="res">${x.icon} ${x.name}<input type="number" min="0" max="99" value="0" inputmode="numeric" id="${prefix}-${x.id}"></label>`).join('');
+}
+function readBundle(prefix) {
+  const out = {};
+  for (const x of RESOURCES) { const n = parseInt(($('#' + prefix + '-' + x.id) || {}).value, 10); if (n > 0) out[x.id] = n; }
+  return out;
+}
+
+function realmTradeSheet() {
+  const me = realmPlayer(), others = visiblePlayers().filter(p => p !== me);
+  if (!others.length) { toast('Nobody to trade with'); return; }
+  sheet(`<h2>🤝 ${playerName(me)} trades</h2>
+    <label>With <select id="trade-with">${others.map(p => `<option value="${p}">${playerName(p)}</option>`).join('')}</select></label>
+    <div class="trade"><div><h3>${playerName(me)} gives</h3>${bundleRows('give')}</div><div><h3>and gets</h3>${bundleRows('get')}</div></div>
+    <p class="muted">Agree on it in the car first. Both players need what they're giving.</p>
+    <div class="row"><button class="primary" data-act="realm-trade-yes">Shake on it</button><button class="ghost" data-act="close">Cancel</button></div>`);
+}
+
+function realmBankSheet() {
+  const me = realmPlayer();
+  const pick = id => `<div class="who">${RESOURCES.map((x, i) => `<label class="chip"><input type="radio" name="${id}" value="${x.id}" ${i === 0 ? 'checked' : ''}> ${x.icon} ${x.name}</label>`).join('')}</div>`;
+  sheet(`<h2>🏦 The bank</h2><p>${playerName(me)} gives ${BANK_RATE} of one resource for 1 of another.</p>
+    <h3>Give ${BANK_RATE}</h3>${pick('bank-give')}<h3>Get 1</h3>${pick('bank-get')}
+    <div class="row"><button class="primary" data-act="realm-bank-yes">Trade with the bank</button><button class="ghost" data-act="close">Cancel</button></div>`);
+}
+
+function realmRulesSheet() {
+  sheet(`<h2>❓ How the Realm works</h2>
+    <ul class="rules">
+      <li><b>Claim the map.</b> Every sighting with a location lands on a hex about 20 km across. Whoever has spotted the most in a hex holds it. The board grows with every trip.</li>
+      <li><b>Get paid after the trip.</b> When a trip ends, everyone gets one of each resource for coming along, plus ${RESOURCES.map(x => `${x.icon} 1 for every ${EARN_EVERY[x.id] === 1 ? '' : EARN_EVERY[x.id] + ' '}${x.from}`).join(', ')}.</li>
+      <li><b>Cemeteries are the robber.</b> Whoever calls a cemetery takes one resource from each flock they killed when the trip's pay comes in.</li>
+      <li><b>Build.</b> ${Object.values(BUILDINGS).map(b => `${b.icon} ${b.name}: ${costText(b.cost)}`).join(' · ')}. Settle a hex you hold or one your road reaches. Roads run between neighbouring hexes from your settlements and roads.</li>
+      <li><b>Harvest.</b> After every trip that passes through a settled hex, its owner gets 1 of that hex's resource (2 for a city).</li>
+      <li><b>Trade.</b> Swap with each other any time, or with the bank at ${BANK_RATE} for 1.</li>
+      <li><b>Points.</b> Settlement 1, city 2. Longest Road (at least ${LONGEST_ROAD_MIN} in a row) and Biggest Territory (at least ${BIGGEST_LAND_MIN} hexes) are worth 2 each.</li>
+    </ul>
+    <div class="row"><button class="ghost" data-act="close">Got it</button></div>`);
+}
+
 // ---------- Stats and awards ----------
 
 function visiblePlayers() { return state.playerOrder.filter(pid => !state.players[pid].hidden); }
@@ -462,6 +585,7 @@ const CERT_THEMES = {
   plates: ['#ef4444', '#3b82f6', '#b91c1c', '#1d4ed8'],
   trips: ['#06b6d4', '#8b5cf6', '#0e7490', '#7c3aed'],
   level: ['#f43f5e', '#f59e0b', '#be123c', '#7c3aed'],
+  realm: ['#f59e0b', '#10b981', '#b45309', '#047857'],
 };
 
 // Confetti scattered round the page, the same every time for the same name.
@@ -757,7 +881,7 @@ function onClick(ev) {
       toast(`🚚 ${esc(volvoName(d.color, d.branded === '1'))}!`);
       break;
     case 'undo': {
-      const e = lastUndoable(db.events, state, t.id, d.player, d.game);
+      const e = lastUndoable(db.events, state, t ? t.id : null, d.player, d.game);
       if (!e) { toast('Nothing to undo'); break; }
       record('undo', { target: e.id });
       toast('Undone');
@@ -823,6 +947,35 @@ function onClick(ev) {
       render();
       break;
     case 'trip-certs': tripCertsSheet(d.trip); break;
+    case 'realm-who': db.realmPlayer = d.player; save(); render(); break;
+    case 'realm-rules': realmRulesSheet(); break;
+    case 'realm-trade': realmTradeSheet(); break;
+    case 'realm-bank': realmBankSheet(); break;
+    case 'realm-build': {
+      record('realm.build', { player: realmPlayer(), kind: d.kind, hex: d.hex, to: d.to });
+      closeSheet();
+      toast(`${BUILDINGS[d.kind].icon} ${playerName(realmPlayer())} built a ${BUILDINGS[d.kind].name.toLowerCase()}!`, true);
+      break;
+    }
+    case 'realm-trade-yes': {
+      const give = readBundle('give'), get = readBundle('get'), other = $('#trade-with').value, me = realmPlayer();
+      if (!Object.keys(give).length || !Object.keys(get).length) { toast('Pick what each side gives'); break; }
+      if (!canPay(purseOf(me), give)) { toast(`${playerName(me)} doesn't have that`); break; }
+      if (!canPay(purseOf(other), get)) { toast(`${playerName(other)} doesn't have that`); break; }
+      record('realm.trade', { player: me, with: other, give, get });
+      closeSheet();
+      toast('🤝 Deal!');
+      break;
+    }
+    case 'realm-bank-yes': {
+      const g = document.querySelector('input[name=bank-give]:checked').value, w = document.querySelector('input[name=bank-get]:checked').value, me = realmPlayer();
+      if (g === w) { toast('Pick two different resources'); break; }
+      if (!canPay(purseOf(me), { [g]: BANK_RATE })) { toast(`${playerName(me)} needs ${BANK_RATE} of those`); break; }
+      record('realm.trade', { player: me, with: 'bank', give: { [g]: BANK_RATE }, get: { [w]: 1 } });
+      closeSheet();
+      toast('🏦 Done');
+      break;
+    }
     case 'cert-trip': closeSheet(); showCert(tripCert(d.player, d.trip)); break;
     case 'cert-award': closeSheet(); showCert(awardCert(d.player, d.award, d.trip)); break;
     case 'cert-level': showCert(levelCert(d.player)); break;

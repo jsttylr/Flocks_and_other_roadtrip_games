@@ -267,6 +267,27 @@ button.holy { background: #f3e3a3; border-color: #e0c860; color: #5a4600; }
 code { font-size: 0.8em; word-break: break-all; }
 .steps a, .card p a { color: var(--green); }
 
+/* Realm */
+.realm-head .who button { min-height: 48px; font-size: 1em; opacity: 0.55; }
+.realm-head .who button.on { opacity: 1; box-shadow: 0 0 0 3px var(--card), 0 0 0 6px var(--pc); }
+table.realm td, table.realm th { text-align: center; }
+table.realm tr.me td { background: var(--soft); }
+table.realm td.pts { font-weight: 800; font-size: 1.2em; color: var(--green); }
+.realm-map { height: calc(100vh - 420px); min-height: 380px; }
+.sheet select { font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); min-height: 48px; width: 100%; }
+.hexlabel { background: none; border: none; display: grid; place-items: center; }
+.hexlabel .rt { font-size: 18px; opacity: 0.8; }
+.hexlabel .rb { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 3px solid #fff; font-size: 17px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.stack button { justify-content: space-between; }
+.stack button:disabled { opacity: 0.5; }
+.cost { font-weight: 800; white-space: nowrap; }
+.trade { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+label.res { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
+label.res input { width: 70px; margin: 0; }
+label.chip { display: inline-flex; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
+.rules li { margin-bottom: 8px; }
+
 /* Certificates: bright and loud on purpose, whatever the night setting. */
 button.small { padding: 6px 10px; font-size: 0.85em; }
 .award.got[data-act] { cursor: pointer; }

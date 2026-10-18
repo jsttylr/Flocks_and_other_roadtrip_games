@@ -144,6 +144,10 @@ const AWARDS = [
   { id: 'full_house', repeat: true, game: 'plates', icon: '🧹', name: 'Clean Sweep', desc: 'All 50 states on one trip', check: c => c.trip && US_STATES.every(s => c.trip.plates[s]) },
   { id: 'fifty_club', game: 'plates', icon: '🇺🇸', name: 'Fifty Club', desc: 'All 50 states over all your trips', check: c => US_STATES.every(s => c.life.uniquePlates.has(s)) },
 
+  { id: 'homesteader', game: 'realm', icon: '🏠', name: 'Homesteader', desc: 'Build your first settlement in the Realm', check: c => c.e.type === 'realm.build' && c.e.data.kind === 'settlement' },
+  { id: 'city_slicker', game: 'realm', icon: '🏙️', name: 'City Slicker', desc: 'Grow a settlement into a city', check: c => c.e.type === 'realm.build' && c.e.data.kind === 'city' },
+  { id: 'long_haul', game: 'realm', icon: '🛤️', name: 'Long Haul', desc: 'Hold the Longest Road in the Realm', check: c => c.realm && c.realm.longest === c.pid },
+  { id: 'land_baron', game: 'realm', icon: '🗺️', name: 'Land Baron', desc: 'Hold Biggest Territory in the Realm', check: c => c.realm && c.realm.biggest === c.pid },
   { id: 'buckle_up', game: 'trips', icon: '🚙', name: 'Buckle Up', desc: 'Play your first trip', check: c => c.life.trips >= 1 },
   { id: 'road_warrior', game: 'trips', icon: '🛣️', name: 'Road Warrior', desc: 'Play on 10 trips', check: c => c.life.trips >= 10 },
   { id: 'globetrotter', game: 'trips', icon: '🧳', name: 'Globetrotter', desc: 'Play on 25 trips', check: c => c.life.trips >= 25 },
@@ -193,7 +197,10 @@ function cleanLoc(l) {
 function buildState(events, seenIds) {
   const sorted = [...events].sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const undone = new Set(sorted.filter(e => e.type === 'undo' && e.data && e.data.target).map(e => e.data.target));
-  const st = { players: {}, playerOrder: [], trips: {}, tripOrder: [], life: {}, newAwards: [], undone };
+  const st = { players: {}, playerOrder: [], trips: {}, tripOrder: [], life: {}, newAwards: [], undone, realm: emptyRealm() };
+  const realm = st.realm;
+  const purse = pid => realm.purse[pid] || (realm.purse[pid] = emptyPurse());
+  const earn = (trip, pid, res, n = 1) => { const t = trip.earned[pid] || (trip.earned[pid] = emptyPurse()); t[res] += n; };
 
   const life = pid => st.life[pid] || (st.life[pid] = emptyLife());
   // l.awards[id] is { ts, trip } of the first time, plus count, the last time
@@ -206,7 +213,7 @@ function buildState(events, seenIds) {
       const got = l.awards[a.id];
       if (got && (!a.repeat || !tripId || got.trips.includes(tripId))) continue;
       let ok = false;
-      try { ok = !!a.check({ life: l, e, ...ctx }); } catch (_) { ok = false; }
+      try { ok = !!a.check({ life: l, e, realm, pid, ...ctx }); } catch (_) { ok = false; }
       if (!ok) continue;
       if (got) { got.count++; got.last = { ts: e.ts, trip: tripId }; got.trips.push(tripId); }
       else l.awards[a.id] = { ts: e.ts, trip: tripId, count: 1, last: { ts: e.ts, trip: tripId }, trips: tripId ? [tripId] : [] };
@@ -220,7 +227,18 @@ function buildState(events, seenIds) {
   // A sighting on the map.
   const pin = (trip, e, kind, label, icon, pid) => {
     const loc = cleanLoc(e.data.loc);
-    if (loc) trip.pins.push({ ...loc, ts: e.ts, kind, label, icon, player: pid || null, event: e.id });
+    if (!loc) return;
+    trip.pins.push({ ...loc, ts: e.ts, kind, label, icon, player: pid || null, event: e.id });
+    // The same sighting claims ground in the Realm.
+    const key = hexAt(loc.lat, loc.lon);
+    const h = realm.hexes[key] || (realm.hexes[key] = { key, counts: {}, kinds: {}, owner: null, terrain: null, building: null, first: e.ts });
+    trip.hexHits.add(key);
+    const res = PIN_RESOURCE[kind];
+    if (res) { h.kinds[res] = (h.kinds[res] || 0) + 1; h.terrain = RESOURCES.map(r => r.id).reduce((a, b) => (h.kinds[b] || 0) > (h.kinds[a] || 0) ? b : a, res); }
+    if (pid) {
+      h.counts[pid] = (h.counts[pid] || 0) + 1;
+      if (!h.owner || (h.owner !== pid && h.counts[pid] > (h.counts[h.owner] || 0))) h.owner = pid;
+    }
   };
   // Checks and returns the trip and player an in-trip event is about.
   const inTrip = d => {
@@ -231,6 +249,29 @@ function buildState(events, seenIds) {
   const count = d => {
     const n = Math.floor(Number(d.n === undefined ? 1 : d.n) || 0);
     return n > 0 && n <= 100000 ? n : 0;
+  };
+
+  // Points: 1 a settlement, 2 a city, and 2 each for Longest Road and Biggest Territory.
+  const realmScore = () => {
+    const pids = st.playerOrder;
+    const best = (vals, min, holder) => {
+      const top = Math.max(0, ...pids.map(p => vals[p] || 0));
+      if (top < min) return null;
+      const leaders = pids.filter(p => (vals[p] || 0) === top);
+      return leaders.includes(holder) ? holder : leaders.length === 1 ? leaders[0] : null;
+    };
+    realm.land = {};
+    for (const h of Object.values(realm.hexes)) if (h.owner) realm.land[h.owner] = (realm.land[h.owner] || 0) + 1;
+    for (const p of pids) realm.roadLength[p] = longestRoad(realm.roads, p);
+    realm.longest = best(realm.roadLength, LONGEST_ROAD_MIN, realm.longest);
+    realm.biggest = best(realm.land, BIGGEST_LAND_MIN, realm.biggest);
+    for (const p of pids) {
+      let pts = 0;
+      for (const h of Object.values(realm.hexes)) if (h.building && h.building.player === p) pts += BUILDINGS[h.building.kind].points;
+      if (realm.longest === p) pts += BONUS_POINTS;
+      if (realm.biggest === p) pts += BONUS_POINTS;
+      realm.points[p] = pts;
+    }
   };
 
   for (const e of sorted) {
@@ -254,7 +295,7 @@ function buildState(events, seenIds) {
       case 'trip.start': {
         if (!d.id || st.trips[d.id]) break;
         const players = [...new Set(d.players || [])].filter(pid => st.players[pid]).slice(0, MAX_PLAYERS);
-        const trip = { id: d.id, name: String(d.name || 'Road trip'), players, start: e.ts, end: null, by: {}, plates: {}, pins: [], winners: {}, awards: [], badgesAtEnd: {} };
+        const trip = { id: d.id, name: String(d.name || 'Road trip'), players, start: e.ts, end: null, by: {}, plates: {}, pins: [], winners: {}, awards: [], badgesAtEnd: {}, earned: {}, paid: {}, hexHits: new Set(), steals: [] };
         st.trips[d.id] = trip;
         st.tripOrder.push(d.id);
         for (const pid of players) {
@@ -277,6 +318,26 @@ function buildState(events, seenIds) {
             (won[pid] = won[pid] || []).push(c.id);
           }
         }
+        // Realm payday: resources for the trip's sightings, one of each for
+        // coming along, and a harvest from settled hexes someone drove through.
+        for (const pid of trip.players) {
+          const got = emptyPurse(), seen = trip.earned[pid] || emptyPurse();
+          for (const r of RESOURCES) got[r.id] = Math.floor(seen[r.id] / EARN_EVERY[r.id]) + 1;
+          for (const key of trip.hexHits) {
+            const b = realm.hexes[key].building, t = realm.hexes[key].terrain;
+            if (b && b.player === pid && t) got[t] += b.kind === 'city' ? 2 : 1;
+          }
+          pay(purse(pid), got, 1);
+          trip.paid[pid] = got;
+        }
+        // A cemetery is the robber: its caller takes one of each victim's most plentiful resource.
+        for (const { thief, victims } of trip.steals) {
+          for (const v of victims) {
+            const vp = purse(v), top = RESOURCES.map(r => r.id).reduce((a, b) => vp[b] > vp[a] ? b : a);
+            if (vp[top] > 0) { vp[top]--; purse(thief)[top]++; }
+          }
+        }
+        realmScore();
         for (const pid of trip.players) {
           life(pid).bestFlock = Math.max(life(pid).bestFlock, trip.by[pid].score);
           award(pid, { trip, tp: trip.by[pid], won: won[pid] || [] }, e);
@@ -295,6 +356,7 @@ function buildState(events, seenIds) {
         x.l.byAnimal[animal.id] = (x.l.byAnimal[animal.id] || 0) + n;
         x.l.biggest = Math.max(x.l.biggest, n);
         pin(x.trip, e, 'flock', `${n} ${animal.name.toLowerCase()}`, animal.icon, d.player);
+        earn(x.trip, d.player, 'wool');
         award(d.player, x, e);
         break;
       }
@@ -316,6 +378,8 @@ function buildState(events, seenIds) {
           award(v, { trip: x.trip, tp: vt }, e);
         }
         x.tp.kills += killed;
+        earn(x.trip, d.player, 'lumber');
+        if (victims.length) x.trip.steals.push({ thief: d.player, victims });
         x.l.kills += killed;
         pin(x.trip, e, 'cemetery', `Cemetery: ${victims.length} flock${victims.length === 1 ? '' : 's'} killed`, '🪦', d.player);
         award(d.player, x, e);
@@ -346,6 +410,7 @@ function buildState(events, seenIds) {
         x.l.raised += n;
         x.l.biggestRaise = Math.max(x.l.biggestRaise, n);
         pin(x.trip, e, 'church', `Church: ${n} brought back`, '⛪', d.player);
+        earn(x.trip, d.player, 'lumber');
         award(d.player, x, e);
         break;
       }
@@ -358,6 +423,7 @@ function buildState(events, seenIds) {
         x.l.zombies += n;
         x.l.zombieBy[z.id] = (x.l.zombieBy[z.id] || 0) + n;
         pin(x.trip, e, 'zombie', `Zombie ${z.name.toLowerCase()}${n > 1 ? ' ×' + n : ''}`, z.icon, d.player);
+        earn(x.trip, d.player, 'brick', n);
         award(d.player, x, e);
         break;
       }
@@ -374,6 +440,7 @@ function buildState(events, seenIds) {
         x.l.volvoPoints += pts;
         if (d.branded) { x.tp.volvoBranded++; x.l.volvoBranded++; }
         pin(x.trip, e, 'volvo', volvoName(color, d.branded), '🚚', d.player);
+        earn(x.trip, d.player, 'ore', pts);
         award(d.player, x, e);
         break;
       }
@@ -384,13 +451,48 @@ function buildState(events, seenIds) {
         trip.plates[d.plate] = { ts: e.ts, event: e.id };
         pin(trip, e, 'plate', `${PLATES[d.plate].name} plate`, '🚗', null);
         for (const pid of trip.players) {
+          earn(trip, pid, 'grain');
           life(pid).uniquePlates.add(d.plate);
           award(pid, { trip, tp: trip.by[pid] }, e);
         }
         break;
       }
+      case 'realm.build': {
+        const pid = d.player, kind = d.kind, b = BUILDINGS[kind];
+        if (!st.players[pid] || !b || !canPay(purse(pid), b.cost)) break;
+        if (kind === 'road') {
+          if (!canRoad(realm, pid, d.hex, d.to)) break;
+          realm.roads[roadKey(d.hex, d.to)] = { player: pid, ts: e.ts };
+        } else if (kind === 'settlement') {
+          if (!canSettle(realm, pid, d.hex)) break;
+          realm.hexes[d.hex].building = { player: pid, kind, ts: e.ts };
+        } else {
+          const h = realm.hexes[d.hex];
+          if (!h || !h.building || h.building.player !== pid || h.building.kind !== 'settlement') break;
+          h.building = { player: pid, kind, ts: e.ts };
+        }
+        pay(purse(pid), b.cost);
+        realmScore();
+        award(pid, {}, e);
+        break;
+      }
+      // Two players swap resources, or one swaps 4 of a kind with the bank for 1 of another.
+      case 'realm.trade': {
+        const give = cleanBundle(d.give), get = cleanBundle(d.get);
+        if (!st.players[d.player] || !Object.keys(give).length || !Object.keys(get).length) break;
+        if (d.with === 'bank') {
+          const [gk, gn] = Object.entries(give)[0], [wk, wn] = Object.entries(get)[0];
+          if (Object.keys(give).length !== 1 || Object.keys(get).length !== 1 || gk === wk || gn !== BANK_RATE * wn || !canPay(purse(d.player), give)) break;
+        } else if (!st.players[d.with] || d.with === d.player || !canPay(purse(d.player), give) || !canPay(purse(d.with), get)) break;
+        pay(purse(d.player), give); pay(purse(d.player), get, 1);
+        if (d.with !== 'bank') { pay(purse(d.with), get); pay(purse(d.with), give, 1); }
+        break;
+      }
     }
   }
+
+  realmScore();
+  for (const t of Object.values(st.trips)) t.hexHits = [...t.hexHits];
 
   // The newest trip that hasn't been ended is the one being played.
   st.activeTrip = null;
@@ -399,6 +501,105 @@ function buildState(events, seenIds) {
     if (!t.end) { st.activeTrip = t; break; }
   }
   return st;
+}
+
+// ---------- The Realm ----------
+// The game played after a trip, a bit like Settlers of Catan. Every sighting
+// with a location lands on a hex laid over the real map. Whoever has made the
+// most sightings in a hex holds that territory. Sightings also earn resources,
+// paid out when a trip ends, and players spend them on roads, settlements and
+// cities, and trade them with each other. The board grows with every trip.
+
+const RESOURCES = [
+  { id: 'wool', name: 'Wool', icon: '🐑', from: 'flocks' },
+  { id: 'brick', name: 'Bricks', icon: '🧱', from: 'zombies' },
+  { id: 'ore', name: 'Ore', icon: '⛏️', from: 'Volvo points' },
+  { id: 'grain', name: 'Grain', icon: '🌾', from: 'plates' },
+  { id: 'lumber', name: 'Lumber', icon: '🪵', from: 'cemeteries and churches' },
+];
+// What each kind of sighting is worth, and the terrain a hex full of them becomes.
+const PIN_RESOURCE = { flock: 'wool', zombie: 'brick', volvo: 'ore', plate: 'grain', cemetery: 'lumber', church: 'lumber' };
+const TERRAIN = { wool: '🌿 Pasture', brick: '🧱 Hills', ore: '⛰️ Mountains', grain: '🌾 Fields', lumber: '🌲 Forest' };
+const BUILDINGS = {
+  road: { name: 'Road', icon: '🛣️', cost: { brick: 1, lumber: 1 } },
+  settlement: { name: 'Settlement', icon: '🏠', points: 1, cost: { brick: 1, lumber: 1, wool: 1, grain: 1 } },
+  city: { name: 'City', icon: '🏰', points: 2, cost: { grain: 2, ore: 3 } },
+};
+const BANK_RATE = 4;
+const LONGEST_ROAD_MIN = 5, BIGGEST_LAND_MIN = 3, BONUS_POINTS = 2;
+// Sightings per resource, paid out at the end of a trip, plus one of each for taking part.
+const EARN_EVERY = { wool: 3, brick: 2, ore: 3, grain: 4, lumber: 1 };
+
+// Pointy-top hexes about 20 km across, on a simple flat projection of the map.
+const HEX = 0.18, HEX_LAT0 = Math.cos(40 * Math.PI / 180);
+function hexAt(lat, lon) {
+  const x = lon * HEX_LAT0, y = lat;
+  let q = (Math.sqrt(3) / 3 * x - y / 3) / HEX, r = (2 / 3 * y) / HEX, z = -q - r;
+  let rq = Math.round(q), rr = Math.round(r); const rz = Math.round(z);
+  const dq = Math.abs(rq - q), dr = Math.abs(rr - r), dz = Math.abs(rz - z);
+  if (dq > dr && dq > dz) rq = -rr - rz; else if (dr > dz) rr = -rq - rz;
+  return rq + ',' + rr;
+}
+function hexCorners(key) {
+  const [q, r] = key.split(',').map(Number);
+  const cx = HEX * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r), cy = HEX * 1.5 * r;
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 180 * (60 * i - 30);
+    pts.push([cy + HEX * Math.sin(a), (cx + HEX * Math.cos(a)) / HEX_LAT0]);
+  }
+  return { center: [cy, cx / HEX_LAT0], corners: pts };
+}
+const HEX_DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+function hexNeighbors(key) {
+  const [q, r] = key.split(',').map(Number);
+  return HEX_DIRS.map(([dq, dr]) => (q + dq) + ',' + (r + dr));
+}
+const roadKey = (a, b) => a < b ? a + '|' + b : b + '|' + a;
+const emptyPurse = () => Object.fromEntries(RESOURCES.map(r => [r.id, 0]));
+const canPay = (purse, cost) => Object.entries(cost).every(([k, n]) => (purse[k] || 0) >= n);
+const pay = (purse, cost, sign = -1) => { for (const [k, n] of Object.entries(cost)) purse[k] = (purse[k] || 0) + sign * n; };
+function cleanBundle(b) {
+  const out = {};
+  for (const r of RESOURCES) { const n = Math.floor(Number(b && b[r.id]) || 0); if (n > 0 && n < 1000) out[r.id] = n; }
+  return out;
+}
+
+function emptyRealm() { return { hexes: {}, roads: {}, purse: {}, points: {}, roadLength: {}, land: {}, longest: null, biggest: null }; }
+
+// The longest chain of one player's roads, counted in roads, without using a road twice.
+function longestRoad(roads, pid) {
+  const adj = {};
+  for (const [k, r] of Object.entries(roads)) {
+    if (r.player !== pid) continue;
+    const [a, b] = k.split('|');
+    (adj[a] = adj[a] || []).push([b, k]);
+    (adj[b] = adj[b] || []).push([a, k]);
+  }
+  let best = 0;
+  const used = new Set();
+  const walk = (node, len) => {
+    best = Math.max(best, len);
+    for (const [next, k] of adj[node] || []) {
+      if (used.has(k)) continue;
+      used.add(k); walk(next, len + 1); used.delete(k);
+    }
+  };
+  for (const node of Object.keys(adj)) walk(node, 0);
+  return best;
+}
+
+// Can this player put a building on this hex, or a road between these two hexes?
+function canSettle(realm, pid, key) {
+  const h = realm.hexes[key];
+  if (!h || h.building) return false;
+  if (h.owner === pid) return true;
+  return hexNeighbors(key).some(n => { const r = realm.roads[roadKey(key, n)]; return r && r.player === pid; });
+}
+function canRoad(realm, pid, a, b) {
+  if (!realm.hexes[a] || !realm.hexes[b] || !hexNeighbors(a).includes(b) || realm.roads[roadKey(a, b)]) return false;
+  const mine = k => { const h = realm.hexes[k]; return (h.building && h.building.player === pid) || hexNeighbors(k).some(n => { const r = realm.roads[roadKey(k, n)]; return r && r.player === pid; }); };
+  return mine(a) || mine(b);
 }
 
 // Endorsements: the little extras printed on a certificate, saying how a
@@ -449,16 +650,17 @@ const UNDO_KINDS = {
   flocks: ['flock.add', 'flock.cemetery', 'flock.church', 'flock.wipe'],
   zombies: ['zombie.add'],
   volvos: ['volvo.add'],
+  realm: ['realm.build', 'realm.trade'],
 };
 function lastUndoable(events, st, tripId, playerId, game) {
   const kinds = new Set(UNDO_KINDS[game] || Object.values(UNDO_KINDS).flat());
   let best = null;
   for (const e of events) {
-    if (!kinds.has(e.type) || st.undone.has(e.id) || !e.data || e.data.trip !== tripId) continue;
+    if (!kinds.has(e.type) || st.undone.has(e.id) || !e.data || (game !== 'realm' && e.data.trip !== tripId)) continue;
     if (playerId && e.data.player !== playerId) continue;
     if (!best || e.ts > best.ts || (e.ts === best.ts && e.id > best.id)) best = e;
   }
   return best;
 }
 
-if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };
+if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };

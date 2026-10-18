@@ -1,7 +1,7 @@
 // Run with: node --test 'tests/*.test.js'
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildState, lastUndoable, US_STATES, volvoName, levelFor, AWARDS, endorsements } = require('../web/games.js');
+const { buildState, lastUndoable, US_STATES, volvoName, levelFor, AWARDS, endorsements, hexAt, hexNeighbors, longestRoad, roadKey } = require('../web/games.js');
 
 // An ordinary day (noon, no holiday, no full moon) so hidden awards stay hidden.
 const BASE = new Date(2026, 0, 20, 12).getTime();
@@ -156,4 +156,47 @@ test('certificate endorsements say how the trip was won', () => {
   assert.deepEqual(endorsements(t, 'mom', 'flocks'), ['Survived a cemetery']);
   assert.ok(t.awards.some(a => a.player === 'kid' && a.award === 'champion'));
   assert.equal(t.badgesAtEnd.kid, st.life.kid.badges);
+});
+
+test('the Realm: territory, payday, building, trading and longest road', () => {
+  const evs = trip();
+  const here = { lat: 41.26, lon: -95.94 };
+  const home = hexAt(here.lat, here.lon);
+  // Kid makes three sightings in one hex, mom one: the hex is kid's.
+  for (let i = 0; i < 3; i++) evs.push(E('flock.add', { trip: 't1', player: 'kid', animal: 'cow', n: 2, loc: here }));
+  evs.push(E('zombie.add', { trip: 't1', player: 'mom', animal: 'deer', loc: here }));
+  evs.push(E('flock.cemetery', { trip: 't1', player: 'kid', victims: ['mom'] }));
+  evs.push(E('trip.end', { id: 't1' }));
+  let st = buildState(evs);
+  const h = st.realm.hexes[home];
+  assert.equal(h.owner, 'kid');
+  assert.equal(h.terrain, 'wool');
+  // Kid: wool 3/3+1 = 2, lumber 1/1+1 = 2, others 1. Then the cemetery steals one from mom.
+  assert.equal(st.trips.t1.paid.kid.wool, 2);
+  assert.equal(st.trips.t1.paid.kid.lumber, 2);
+  const kidBefore = { ...st.realm.purse.kid };
+  assert.equal(Object.values(kidBefore).reduce((a, b) => a + b, 0), 8, '7 paid + 1 stolen');
+
+  evs.push(E('realm.build', { player: 'mom', kind: 'settlement', hex: home }));     // not mom's land: refused
+  evs.push(E('realm.build', { player: 'kid', kind: 'settlement', hex: home }));
+  const next = hexNeighbors(home)[0];
+  evs.push(E('realm.build', { player: 'kid', kind: 'road', hex: home, to: next }));   // next isn't on the board yet: refused
+  st = buildState(evs);
+  assert.deepEqual(st.realm.hexes[home].building && st.realm.hexes[home].building.player, 'kid');
+  assert.equal(st.realm.points.kid, 1);
+  assert.equal(Object.keys(st.realm.roads).length, 0);
+  assert.ok(st.life.kid.awards.homesteader);
+
+  // Trading checks both sides can pay; the bank takes 4 for 1.
+  evs.push(E('realm.trade', { player: 'kid', with: 'mom', give: { wool: 1 }, get: { ore: 1 } }));
+  evs.push(E('realm.trade', { player: 'kid', with: 'mom', give: { wool: 50 }, get: { ore: 1 } }));
+  evs.push(E('realm.trade', { player: 'kid', with: 'bank', give: { lumber: 3 }, get: { ore: 1 } }));
+  st = buildState(evs);
+  assert.equal(st.realm.purse.kid.ore, kidBefore.ore + 1);
+  assert.equal(st.realm.purse.kid.wool, kidBefore.wool - 1 - 1, 'one for the settlement, one traded');
+
+  const roads = {};
+  ['a|b', 'b|c', 'c|d', 'b|e'].forEach(k => { roads[k] = { player: 'kid' }; });
+  assert.equal(longestRoad(roads, 'kid'), 3);
+  assert.equal(roadKey('b', 'a'), 'a|b');
 });
