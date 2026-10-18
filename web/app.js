@@ -76,9 +76,22 @@ function startGeo() {
   geoWatch = navigator.geolocation.watchPosition(p => {
     fix = { lat: +p.coords.latitude.toFixed(6), lon: +p.coords.longitude.toFixed(6), acc: Math.round(p.coords.accuracy), at: Date.now() };
     geoState = 'on';
+    noteHex();
   }, err => {
     geoState = err.code === 1 ? 'denied' : 'searching';
   }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 60000 });
+}
+
+// Driving into a tile this trip hasn't touched yet is saved, so the map and
+// the explorer scores count the road travelled, not just the sightings.
+const sentHexes = new Set();
+function noteHex() {
+  const t = state && state.activeTrip;
+  if (!t || !fix || fix.acc > 300) return;
+  const key = hexAt(fix.lat, fix.lon);
+  if (t.hexHits.includes(key) || sentHexes.has(t.id + key)) return;
+  sentHexes.add(t.id + key);
+  record('trip.hex', { trip: t.id, loc: { lat: fix.lat, lon: fix.lon } });
 }
 
 function here() {
@@ -396,8 +409,25 @@ function viewRealm() {
       <div class="scroll"><table class="stats realm"><thead><tr><th></th><th>Points</th>${RESOURCES.map(x => `<th title="${x.name}">${x.icon}</th>`).join('')}<th>Land</th><th>Road</th><th>Rank</th></tr></thead><tbody>${board}</tbody></table></div>
       <div class="row"><button data-act="realm-trade">🤝 Trade</button><button data-act="realm-bank">🏦 Bank ${BANK_RATE} for 1</button><button class="ghost" data-act="undo" data-game="realm" data-player="">↩ Undo</button><button class="ghost" data-act="realm-rules">❓ How to play</button></div>
     </div>
+    ${exploreCard(pids)}
     ${hexes ? `<p class="muted center">Tap a hex to build as <b>${playerName(me)}</b>.</p><div id="realm-map" class="map realm-map"></div>` :
       `<div class="card center"><p>The board is empty. Sightings made on the secure address (with GPS) claim hexes on the map.</p></div>`}`;
+}
+
+function exploreCard(pids) {
+  const score = pid => exploreScore(state.life[pid].explore);
+  const sorted = [...pids].sort((a, b) => score(b) - score(a));
+  const scores = [...new Set(sorted.map(score))];
+  const rows = sorted.map(pid => {
+    const x = state.life[pid].explore, n = score(pid), rk = exploreRank(n), place = scores.indexOf(n);
+    const pct = rk.next ? Math.round(100 * (n - rk.from) / (rk.next.tiles - rk.from)) : 100;
+    return `<div class="explorer"><span class="place">${['🥇', '🥈', '🥉'][place] || place + 1}</span><div>${dot(pid)}<b>${playerName(pid)}</b> · <span class="rank">${rk.title}</span> · <b>${num(n)}</b> <span class="muted">points</span></div>
+      <span class="muted">${plural(x.tiles, 'new tile', 'new tiles')} · ${x.pioneered} pioneered · farthest ${num(x.farthest)} km from home</span>
+      <div class="bar"><div style="width:${pct}%"></div></div>
+      <span class="muted small">${rk.next ? `${rk.next.tiles - n} more for ${rk.next.title}` : 'Top rank!'}</span></div>`;
+  }).join('');
+  return `<div class="card"><h2>🧭 Explorers</h2>
+    <p class="muted">Every tile the family has never been to is worth a point to everyone in the car, whether you spot something there or just drive through (with GPS on). Spot something first in a new tile to pioneer it for 2 bonus points.</p>${rows}</div>`;
 }
 
 function drawRealm() {
@@ -593,6 +623,7 @@ const CERT_THEMES = {
   trips: ['#06b6d4', '#8b5cf6', '#0e7490', '#7c3aed'],
   level: ['#f43f5e', '#f59e0b', '#be123c', '#7c3aed'],
   realm: ['#f59e0b', '#10b981', '#b45309', '#047857'],
+  explore: ['#0ea5e9', '#22d3ee', '#0369a1', '#0891b2'],
 };
 
 // Confetti scattered round the page, the same every time for the same name.

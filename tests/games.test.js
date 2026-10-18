@@ -1,7 +1,7 @@
 // Run with: node --test 'tests/*.test.js'
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildState, lastUndoable, US_STATES, volvoName, levelFor, AWARDS, endorsements, hexAt, hexNeighbors, longestRoad, roadKey, realmCurrent, realmRank } = require('../web/games.js');
+const { buildState, lastUndoable, US_STATES, volvoName, levelFor, AWARDS, endorsements, hexAt, hexNeighbors, longestRoad, roadKey, realmCurrent, realmRank, exploreRank } = require('../web/games.js');
 
 // An ordinary day (noon, no holiday, no full moon) so hidden awards stay hidden.
 const BASE = new Date(2026, 0, 20, 12).getTime();
@@ -210,4 +210,24 @@ test('the Realm: territory, payday, building, trading and longest road', () => {
   assert.equal(longestRoad(roads, 'kid'), 3);
   assert.equal(roadKey('b', 'a'), 'a|b');
   assert.deepEqual([0, 1, 3, 9, 30].map(n => realmRank(n).title), ['Wanderer', 'Squire', 'Knight', 'Baron', 'Monarch']);
+});
+
+test('exploring: new tiles count for the whole car, first sightings make pioneers', () => {
+  const evs = trip();
+  const at = (lat, lon) => ({ lat, lon });
+  evs.push(E('trip.hex', { trip: 't1', loc: at(41.26, -95.94) }));
+  evs.push(E('trip.hex', { trip: 't1', loc: at(41.26, -95.94) }));               // same tile: nothing new
+  evs.push(E('flock.add', { trip: 't1', player: 'kid', animal: 'cow', n: 3, loc: at(41.26, -95.94) })); // first sighting there
+  evs.push(E('zombie.add', { trip: 't1', player: 'mom', animal: 'deer', loc: at(41.26, -95.94) }));     // not first
+  for (let i = 1; i <= 25; i++) evs.push(E('trip.hex', { trip: 't1', loc: at(41.26, -95.94 + i * 0.5) }));
+  evs.push(E('trip.end', { id: 't1' }));
+  const st = buildState(evs);
+  assert.equal(st.life.mom.explore.tiles, 26);
+  assert.equal(st.life.kid.explore.tiles, 26);
+  assert.equal(st.life.kid.explore.pioneered, 1);
+  assert.equal(st.life.mom.explore.pioneered, 0);
+  assert.ok(st.life.kid.explore.farthest > 950 && st.life.kid.explore.farthest < 1150, String(st.life.kid.explore.farthest));
+  for (const id of ['first_steps', 'off_the_map', 'far_from_home']) assert.ok(st.life.mom.awards[id], id);
+  assert.ok(st.life.kid.awards.pioneer && !st.life.mom.awards.pioneer);
+  assert.equal(exploreRank(26).title, 'Scout');
 });

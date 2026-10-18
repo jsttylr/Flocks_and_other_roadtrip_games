@@ -161,6 +161,14 @@ const AWARDS = [
   { id: 'knighted', game: 'realm', icon: '🛡️', name: 'Knighted', desc: 'Reach the rank of Knight (3 Realm points)', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 3 },
   { id: 'duke', game: 'realm', icon: '🎩', name: 'Your Grace', desc: 'Reach the rank of Duke (15 Realm points)', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 15 },
   { id: 'monarch', game: 'realm', icon: '🫅', name: 'Long Live the Monarch', desc: 'Reach 21 Realm points', check: c => c.realm && (c.realm.points[c.pid] || 0) >= 21 },
+  { id: 'first_steps', game: 'explore', icon: '👣', name: 'First Steps', desc: 'Explore your first new map tile', check: c => c.life.explore.tiles >= 1 },
+  { id: 'pioneer', game: 'explore', icon: '🚩', name: 'Pioneer', desc: 'Be the first to spot something in a new tile', check: c => c.life.explore.pioneered >= 1 },
+  { id: 'frontier', game: 'explore', icon: '🏕️', name: 'Frontier Spirit', desc: 'Pioneer 25 tiles', check: c => c.life.explore.pioneered >= 25 },
+  { id: 'off_the_map', repeat: true, game: 'explore', icon: '🔭', name: 'Off the Map', desc: 'Explore 20 new tiles on one trip', check: c => c.tp && c.tp.explored >= 20 },
+  { id: 'cartographer', game: 'explore', icon: '📜', name: 'Cartographer', desc: 'Explore 100 tiles', check: c => c.life.explore.tiles >= 100 },
+  { id: 'regular', game: 'explore', icon: '☕', name: 'Regulars', desc: 'Pass through the same tile on 10 trips', check: c => c.life.explore.mostVisits >= 10 },
+  { id: 'far_from_home', game: 'explore', icon: '🛰️', name: 'Far From Home', desc: 'Reach a tile 500 km from where your map began', check: c => c.life.explore.farthest >= 500 },
+  { id: 'thousand_miles', game: 'explore', icon: '🌎', name: 'A Thousand Miles', desc: 'Reach a tile 1,600 km from where your map began', check: c => c.life.explore.farthest >= 1600 },
   { id: 'buckle_up', game: 'trips', icon: '🚙', name: 'Buckle Up', desc: 'Play your first trip', check: c => c.life.trips >= 1 },
   { id: 'road_warrior', game: 'trips', icon: '🛣️', name: 'Road Warrior', desc: 'Play on 10 trips', check: c => c.life.trips >= 10 },
   { id: 'globetrotter', game: 'trips', icon: '🧳', name: 'Globetrotter', desc: 'Play on 25 trips', check: c => c.life.trips >= 25 },
@@ -190,12 +198,13 @@ function emptyLife() {
     kills: 0, deaths: 0, lost: 0, biggestLoss: 0, churches: 0, raised: 0, biggestRaise: 0,
     zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0,
     uniquePlates: new Set(), awards: {}, badges: 0,
+    explore: { tiles: 0, pioneered: 0, farthest: 0, mostVisits: 0 },
     realm: { roads: 0, settlements: 0, cities: 0, trades: 0, bank: 0, stolen: 0, harvested: 0, turns: 0 },
   };
 }
 
 function emptyTripPlayer() {
-  return { score: 0, counted: 0, dead: 0, deaths: 0, kills: 0, churches: 0, byAnimal: {}, zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0 };
+  return { explored: 0, score: 0, counted: 0, dead: 0, deaths: 0, kills: 0, churches: 0, byAnimal: {}, zombies: 0, zombieBy: {}, volvos: 0, volvoPoints: 0, volvoBy: {}, volvoBranded: 0 };
 }
 
 // A location saved with a sighting, if it looks sane.
@@ -245,14 +254,38 @@ function buildState(events, seenIds) {
     trip.pins.push({ ...loc, ts: e.ts, kind, label, icon, player: pid || null, event: e.id });
     // The same sighting claims ground in the Realm.
     const key = hexAt(loc.lat, loc.lon);
-    const h = realm.hexes[key] || (realm.hexes[key] = { key, counts: {}, kinds: {}, owner: null, terrain: null, building: null, first: e.ts });
-    trip.hexHits.add(key);
+    const h = visit(trip, key, e, pid);
     const res = PIN_RESOURCE[kind];
     if (res) { h.kinds[res] = (h.kinds[res] || 0) + 1; h.terrain = RESOURCES.map(r => r.id).reduce((a, b) => (h.kinds[b] || 0) > (h.kinds[a] || 0) ? b : a, res); }
     if (pid) {
       h.counts[pid] = (h.counts[pid] || 0) + 1;
       if (!h.owner || (h.owner !== pid && h.counts[pid] > (h.counts[h.owner] || 0))) h.owner = pid;
     }
+  };
+  // A trip reaching a hex, by a sighting or just driving through. A hex nobody
+  // in the family has been to before counts as explored for everyone in the
+  // car; a first sighting there makes its spotter a pioneer.
+  const visit = (trip, key, e, pid) => {
+    let h = realm.hexes[key];
+    if (!h) {
+      h = realm.hexes[key] = { key, counts: {}, kinds: {}, owner: null, terrain: null, building: null, first: e.ts, trips: new Set(), spotted: false };
+      if (!realm.home) realm.home = key;
+      const km = hexKm(realm.home, key);
+      for (const p of trip.players) {
+        const l = life(p);
+        l.explore.tiles++;
+        l.explore.farthest = Math.max(l.explore.farthest, km);
+        trip.by[p].explored++;
+      }
+    }
+    if (pid && !h.spotted) life(pid).explore.pioneered++;
+    if (pid) h.spotted = true;
+    if (!h.trips.has(trip.id)) {
+      h.trips.add(trip.id);
+      for (const p of trip.players) life(p).explore.mostVisits = Math.max(life(p).explore.mostVisits, h.trips.size);
+    }
+    trip.hexHits.add(key);
+    return h;
   };
   // Checks and returns the trip and player an in-trip event is about.
   const inTrip = d => {
@@ -478,6 +511,14 @@ function buildState(events, seenIds) {
         }
         break;
       }
+      // The iPad drove into a hex it hadn't been in yet on this trip.
+      case 'trip.hex': {
+        const trip = st.trips[d.trip], loc = cleanLoc(d.loc);
+        if (!trip || trip.end || !loc) break;
+        visit(trip, hexAt(loc.lat, loc.lon), e, null);
+        for (const pid of trip.players) award(pid, { trip, tp: trip.by[pid] }, e);
+        break;
+      }
       case 'realm.build': {
         const pid = d.player, kind = d.kind, b = BUILDINGS[kind];
         if (!st.players[pid] || !b || !realmMayPlay(realm, pid) || !canPay(purse(pid), b.cost)) break;
@@ -527,6 +568,7 @@ function buildState(events, seenIds) {
 
   realmScore();
   for (const t of Object.values(st.trips)) t.hexHits = [...t.hexHits];
+  for (const h of Object.values(realm.hexes)) h.visits = h.trips.size;
 
   // The newest trip that hasn't been ended is the one being played.
   st.activeTrip = null;
@@ -589,6 +631,22 @@ function hexNeighbors(key) {
   const [q, r] = key.split(',').map(Number);
   return HEX_DIRS.map(([dq, dr]) => (q + dq) + ',' + (r + dr));
 }
+// Distance between two hex centres, in km.
+function hexKm(a, b) {
+  const [la1, lo1] = hexCorners(a).center, [la2, lo2] = hexCorners(b).center, rad = Math.PI / 180;
+  const h = Math.sin((la2 - la1) * rad / 2) ** 2 + Math.cos(la1 * rad) * Math.cos(la2 * rad) * Math.sin((lo2 - lo1) * rad / 2) ** 2;
+  return Math.round(2 * 6371 * Math.asin(Math.sqrt(h)));
+}
+// Explorer score: 1 for every tile the family had never been to, reached with
+// this player in the car, plus 2 more for each one they pioneered (spotted
+// something there first). Ranks go by the score.
+const exploreScore = x => x.tiles + 2 * x.pioneered;
+const EXPLORE_RANKS = [[0, 'Homebody'], [5, 'Day Tripper'], [15, 'Scout'], [40, 'Pathfinder'], [80, 'Voyager'], [150, 'Explorer'], [300, 'Cartographer'], [600, 'Legend of the Road']];
+function exploreRank(tiles) {
+  let i = 0;
+  while (i + 1 < EXPLORE_RANKS.length && tiles >= EXPLORE_RANKS[i + 1][0]) i++;
+  return { title: EXPLORE_RANKS[i][1], from: EXPLORE_RANKS[i][0], next: EXPLORE_RANKS[i + 1] ? { tiles: EXPLORE_RANKS[i + 1][0], title: EXPLORE_RANKS[i + 1][1] } : null };
+}
 const roadKey = (a, b) => a < b ? a + '|' + b : b + '|' + a;
 const emptyPurse = () => Object.fromEntries(RESOURCES.map(r => [r.id, 0]));
 const canPay = (purse, cost) => Object.entries(cost).every(([k, n]) => (purse[k] || 0) >= n);
@@ -599,7 +657,7 @@ function cleanBundle(b) {
   return out;
 }
 
-function emptyRealm() { return { hexes: {}, roads: {}, purse: {}, points: {}, roadLength: {}, land: {}, longest: null, biggest: null, turn: null }; }
+function emptyRealm() { return { home: null, hexes: {}, roads: {}, purse: {}, points: {}, roadLength: {}, land: {}, longest: null, biggest: null, turn: null }; }
 
 // Ranks in the Realm go by Realm points.
 const REALM_RANKS = [[0, 'Wanderer'], [1, 'Squire'], [3, 'Knight'], [6, 'Baron'], [10, 'Count'], [15, 'Duke'], [21, 'Monarch']];
@@ -708,4 +766,4 @@ function lastUndoable(events, st, tripId, playerId, game) {
   return best;
 }
 
-if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, REALM_RANKS, realmRank, realmCurrent, realmMayPlay, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };
+if (typeof module !== 'undefined') module.exports = { ANIMALS, ZOMBIES, VOLVO_COLORS, PLATES, PLATE_REGIONS, US_STATES, AWARDS, LEVEL_TITLES, levelFor, plateKey, endorsements, RESOURCES, BUILDINGS, TERRAIN, BANK_RATE, EARN_EVERY, LONGEST_ROAD_MIN, BIGGEST_LAND_MIN, REALM_RANKS, realmRank, EXPLORE_RANKS, exploreRank, exploreScore, hexKm, realmCurrent, realmMayPlay, hexAt, hexCorners, hexNeighbors, roadKey, canSettle, canRoad, canPay, longestRoad, CONTESTS, PLAYER_COLORS, MAX_PLAYERS, volvoName, buildState, lastUndoable };

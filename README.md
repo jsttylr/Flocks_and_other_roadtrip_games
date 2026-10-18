@@ -76,7 +76,9 @@ The game you play after the trip, a bit like Settlers of Catan. Every sighting w
 - **Trade:** on your turn, swap with anyone who agrees, or 4 for 1 with the bank.
 - **Points:** settlement 1, city 2, plus 2 each for **Longest Road** and **Biggest Territory**. Points earn ranks, from Wanderer through Squire, Knight, Baron, Count and Duke to Monarch, and 17 Realm awards count toward your level like every other award.
 
-Open **🏰 Realm**, pick whose turn it is, and tap a hex to build. **❓ How to play** has the full rules.
+**🧭 Explorers:** with GPS on, the iPad notes every tile the trip drives through, not just the ones with sightings. Every tile the family has never been to is worth 1 explorer point to everyone in the car, and whoever spots something first in a new tile pioneers it for 2 more. Explorer points earn ranks from Homebody to Legend of the Road, and there are 8 exploring awards, such as *Pioneer*, *Off the Map* (20 new tiles on one trip), *Regulars* and *A Thousand Miles*.
+
+Open **🏰 Realm**, see whose turn it is, and tap a hex to build. **❓ How to play** has the full rules.
 
 ![The Realm: territory, roads and settlements on the trip map](docs/screenshots/realm.png)
 
