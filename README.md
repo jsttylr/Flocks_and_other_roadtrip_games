@@ -11,7 +11,7 @@ There's more than the scoreboard:
 - **106 awards and player levels**, including awards you can win again on every trip and hidden ones nobody knows about until they're earned.
 - **Printable certificates** for every award, level and trip, signed by Skippy the Magnificent. They're bright and confetti-filled, and made to be handed to a kid in the back seat.
 - **The Realm**, a game a bit like Settlers of Catan (with farms and monasteries borrowed from Carcassonne) for after the trip. Your sightings claim hexes of the real map, earn resources and gold, and build roads, settlements and cities across every trip you take.
-- **The driver** gets their due: a wage in the Realm, a shield from cemeteries, driving awards and ranks, with drivers swapped at any stop.
+- **The driver** gets their due: a wage in the Realm, driving awards and ranks, with drivers swapped at any stop.
 - **Explorer scores** for every new bit of map the car drives through, and the route drawn on the map.
 
 ![Flocks scoreboard for four players](docs/screenshots/flocks.png)
@@ -42,7 +42,7 @@ Up to four players. The switch at the top of the screen flips between the **Comp
 
 Count the animals you see: cows, horses, sheep, goats, chickens, llamas & alpacas, pigs, and live deer. Tap the animal, then tap how many.
 
-- **🪦 Cemetery:** whoever spots one taps **Cemetery** on their own panel and picks whose flocks die. Everyone else is ticked to start with. Those flocks drop to zero. The driver's flock is safe while they drive.
+- **🪦 Cemetery:** whoever spots one taps **Cemetery** on their own panel and picks whose flocks die. Everyone else is ticked to start with. Those flocks drop to zero. That includes the driver's, so a passenger should call churches for them.
 - **⛪ Church:** whoever spots one taps **Church** on their own panel and gets back everything they've lost to cemeteries since their last church.
 - When you end the trip, the biggest flock wins.
 
@@ -80,7 +80,6 @@ The bar above every game shows who's driving and how far they've driven. A passe
 
 ![Choosing the driver and who's in the car](docs/screenshots/car.png)
 
-- **🛡️ Cemetery shield:** while you drive, your flock can't be killed by a cemetery. You can't watch for churches to save it, so it's only fair.
 - **💰 Driver's wage:** driving comes first, so at the end of the trip the driver gets 1 Realm resource for every 50 km driven. They're also topped up to at least the passengers' average for the part of the trip they drove.
 - **🏅 Driving awards and ranks:** 8 awards, such as *Behind the Wheel*, *Wheelman* (50 km on one trip), *Marathon* (300 km without a swap), *Relay Team* (3 swaps on one trip, for everyone in the car), *Night Shift* and *Iron Butt* (1,000 km in total). Lifetime kilometres earn ranks from Learner's Permit to Legend of the Highway, shown under **Stats**.
 - **🚙 Who's in the car:** the same sheet lets someone hop in or out at a stop, like a cousin who rides along for one day. You only play while you're in the car, and you still get paid in the Realm for your part of the trip.
