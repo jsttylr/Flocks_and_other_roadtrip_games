@@ -3,7 +3,7 @@
 
 // The page's version. It must match appVersion in main.go (a Go test checks),
 // so a page left over on the iPad can tell the server has a newer one.
-const PAGE_VERSION = '0.4.1';
+const PAGE_VERSION = '0.4.2';
 
 // Flocks: live animals. A cemetery kills flocks; a church brings yours back.
 // Deer count too, but they aren't farm animals, so Old MacDonald doesn't need them.
@@ -574,8 +574,7 @@ function buildState(events, seenIds) {
       case 'flock.cemetery': {
         const x = inTrip(d);
         if (!x) break;
-        // The driver's flock is safe: they can't watch for churches.
-        const victims = [...new Set(d.victims || [])].filter(v => x.trip.aboard.has(v) && v !== x.trip.driver);
+        const victims = [...new Set(d.victims || [])].filter(v => x.trip.aboard.has(v));
         let killed = 0;
         for (const v of victims) {
           const vt = x.trip.by[v], vl = life(v);

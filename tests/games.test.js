@@ -232,7 +232,7 @@ test('exploring: new tiles count for the whole car, first sightings make pioneer
   assert.equal(exploreRank(46).title, 'Scout');
 });
 
-test('the driver: km by GPS, a shield from cemeteries, swaps, a wage and awards', () => {
+test('the driver: km by GPS, swaps, a wage and awards', () => {
   const evs = trip(['mom', 'kid', 'dad']);
   evs[evs.length - 1].data.driver = 'dad';
   const step = 0.009;                       // about 1 km of latitude
@@ -240,7 +240,7 @@ test('the driver: km by GPS, a shield from cemeteries, swaps, a wage and awards'
   for (let i = 0; i <= 60; i++) evs.push(E('trip.track', { trip: 't1', loc: at(i) }));
   evs.push(E('flock.add', { trip: 't1', player: 'dad', animal: 'cow', n: 40 }));
   evs.push(E('flock.add', { trip: 't1', player: 'kid', animal: 'deer', n: 6 }));
-  evs.push(E('flock.cemetery', { trip: 't1', player: 'kid', victims: ['dad', 'mom'] }));   // dad is driving: safe
+  evs.push(E('flock.cemetery', { trip: 't1', player: 'kid', victims: ['dad', 'mom'] }));   // driving doesn't protect dad
   evs.push(E('trip.driver', { trip: 't1', player: 'mom' }));
   for (let i = 61; i <= 80; i++) evs.push(E('trip.track', { trip: 't1', loc: at(i) }));
   evs.push(E('trip.driver', { trip: 't1', player: null }));
@@ -248,7 +248,8 @@ test('the driver: km by GPS, a shield from cemeteries, swaps, a wage and awards'
   for (let i = 0; i < 12; i++) evs.push(E('zombie.add', { trip: 't1', player: 'kid', animal: 'rabbit' }));
   evs.push(E('trip.end', { id: 't1' }));
   const st = buildState(evs), t = st.trips.t1;
-  assert.equal(t.by.dad.score, 40, "the driver's flock survived");
+  assert.equal(t.by.dad.score, 0, "the driver's flock dies like anyone's");
+  assert.equal(t.by.dad.dead, 40);
   assert.equal(t.by.kid.byAnimal.deer, 6, 'live deer count as a flock');
   assert.ok(st.life.kid.awards.bambi);
   assert.ok(Math.abs(t.by.dad.driven - 60) < 1, String(t.by.dad.driven));

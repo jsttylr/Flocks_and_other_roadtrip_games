@@ -296,7 +296,7 @@ function viewFlocks() {
   return panels(t, (pid, tp, p) => `
     ${phead(t, pid, p, lead, '👑')}
     <div class="score">${num(tp.score)}</div>
-    <div class="sub">${tp.dead ? `⛪ ${num(tp.dead)} waiting for a church` : `${num(tp.counted)} counted`} · ${plural(tp.deaths, 'death', 'deaths')}${t.driver === pid ? ' · 🛡️ safe from cemeteries while driving' : ''}</div>
+    <div class="sub">${tp.dead ? `⛪ ${num(tp.dead)} waiting for a church` : `${num(tp.counted)} counted`} · ${plural(tp.deaths, 'death', 'deaths')}</div>
     <div class="animals">${ANIMALS.map(a => `<button class="animal" data-act="count" data-player="${pid}" data-animal="${a.id}">
       <span class="icon">${a.icon}</span><span>${a.name}</span><span class="n">${num(tp.byAnimal[a.id] || 0)}</span></button>`).join('')}</div>
     <div class="row">
@@ -589,7 +589,7 @@ function realmRulesSheet() {
     <ul class="rules">
       <li><b>Claim the map.</b> Every sighting with a location lands on a hex about 10 km across. Whoever has spotted the most in a hex holds it. The board grows with every trip.</li>
       <li><b>Get paid after the trip.</b> When a trip ends, everyone gets one of each resource for coming along, plus ${RESOURCES.map(x => `${x.icon} 1 for every ${EARN_EVERY[x.id] === 1 ? '' : EARN_EVERY[x.id] + ' '}${x.from}`).join(', ')}.</li>
-      <li><b>The driver's wage.</b> Driving comes first, so the driver gets 1 resource for every ${WAGE_KM} km they drive (bricks, lumber, ore, grain, wool, in turn), and is topped up to at least the passengers' average for the part of the trip they drove. While driving, their flock is safe from cemeteries.</li>
+      <li><b>The driver's wage.</b> Driving comes first, so the driver gets 1 resource for every ${WAGE_KM} km they drive (bricks, lumber, ore, grain, wool, in turn), and is topped up to at least the passengers' average for the part of the trip they drove. A passenger can call churches for them.</li>
       <li><b>Cemeteries are the robber.</b> Whoever calls a cemetery takes one resource from each flock they killed when the trip's pay comes in.</li>
       <li><b>Farms.</b> Every field you spot puts one of your farmers on its tile. Farm tiles that touch make one farm, held by whoever has the most farmers in it (ties share). After every trip, a farm pays its holders 1 🌾 for each settlement and city on it or next to it, whoever built them, and every city it feeds is worth a point to them.</li>
       <li><b>Monasteries and gold.</b> The first church spotted in a tile with nothing built on it founds a monastery for its spotter. After every trip that passes through its tile, it pays 1 🪙 for each of the 6 tiles around it the family has visited. Once all 6 are visited it's complete: a ${MONASTERY_BONUS} 🪙 bonus and 1 point. Gold buys any resource for ${GOLD_PRICE}, can be traded, and the robber can't touch it.</li>
@@ -914,9 +914,9 @@ function countSheet(pid, animal) {
 
 function cemeterySheet(pid) {
   const t = state.activeTrip;
-  const others = t.aboard.filter(x => x !== pid && x !== t.driver);
-  if (!others.length) { toast(t.driver && t.driver !== pid ? `Nobody to bury: ${playerName(t.driver)} is driving, so their flock is safe` : 'Nobody else to bury'); return; }
-  sheet(`<h2>🪦 ${playerName(pid)} spotted a cemetery!</h2><p>Whose flock dies?${t.driver && t.driver !== pid ? ` (${playerName(t.driver)} is driving, so their flock is safe.)` : ''}</p>
+  const others = t.aboard.filter(x => x !== pid);
+  if (!others.length) { toast('Nobody else to bury'); return; }
+  sheet(`<h2>🪦 ${playerName(pid)} spotted a cemetery!</h2><p>Whose flock dies?</p>
     <div class="who pick">${others.map(v => `<label class="pickp" style="--pc:${state.players[v].color}"><input type="checkbox" value="${v}" checked>${playerName(v)} <span class="muted">${num(t.by[v].score)}</span></label>`).join('')}</div>
     <button class="danger big" data-act="cemetery-yes" data-player="${pid}">Kill those flocks</button>`);
 }
@@ -975,7 +975,7 @@ function carSheet() {
     const on = t.aboard.includes(pid);
     return `<button class="crewp${on ? ' on' : ''}" style="--pc:${state.players[pid].color}" data-act="crew" data-player="${pid}" data-aboard="${on ? 0 : 1}">${on ? '✅' : '➕'} ${playerName(pid)}<small>${on ? 'in the car · tap to hop out' : 'tap to hop in'}</small></button>`;
   }).join('');
-  sheet(`<h2>🚗 Who's driving?</h2><p class="muted">A passenger taps this; the driver keeps their eyes on the road. The driver earns a wage in the Realm and their flock is safe from cemeteries.</p>
+  sheet(`<h2>🚗 Who's driving?</h2><p class="muted">A passenger taps this; the driver keeps their eyes on the road. The driver earns a wage in the Realm for every km they drive.</p>
     <div class="stack">${t.aboard.map(pid => opt(pid, `${dot(pid)}${playerName(pid)}`)).join('')}${opt(null, 'Someone not playing')}</div>
     <h2>🚙 Who's in the car?</h2><p class="muted">Hop in or out at a stop. You only play while you're in the car (up to ${MAX_PLAYERS}).</p>
     <div class="who">${crew}</div>
